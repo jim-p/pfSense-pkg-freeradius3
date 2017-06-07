@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <pfsensepkgs>
 	<package>
-		<name>freeradius2</name>
+		<name>freeradius3</name>
 		<website>http://www.freeradius.org/</website>
 		<descr><![CDATA[A free implementation of the RADIUS protocol.&lt;br /&gt;
 			Supports MySQL, PostgreSQL, LDAP, Kerberos.
