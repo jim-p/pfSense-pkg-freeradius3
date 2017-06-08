@@ -321,7 +321,7 @@ function freeradius_settings_resync($restart_svc = true) {
 	if ($sqlconf['varsqlconfincludeenable'] == 'on') {
 		$varsqlconfinstantiate = <<<EOD
 
-	$varsqlconf2failover {
+	{$varsqlconf2failover} {
 		sql
 		{$varsqlconf2instantiate}
 	}
@@ -336,7 +336,7 @@ EOD;
 	}
 
 	$conf .= <<<EOD
-prefix = $varFREERADIUS_BASE
+prefix = {$varFREERADIUS_BASE}
 exec_prefix = \${prefix}
 sysconfdir = \${prefix}/etc
 localstatedir = /var
@@ -353,32 +353,32 @@ run_dir = \${localstatedir}/run
 db_dir = \${raddbdir}
 libdir = {$frlib}
 pidfile = \${run_dir}/\${name}.pid
-max_request_time = $varsettingsmaxrequesttime
-cleanup_delay = $varsettingscleanupdelay
-max_requests = $varsettingsmaxrequests
-hostname_lookups = $varsettingshostnamelookups
-regular_expressions = $varsettingsregularexpressions
-extended_expressions = $varsettingsextendedexpressions
+max_request_time = {$varsettingsmaxrequesttime}
+cleanup_delay = {$varsettingscleanupdelay}
+max_requests = {$varsettingsmaxrequests}
+hostname_lookups = {$varsettingshostnamelookups}
+regular_expressions = {$varsettingsregularexpressions}
+extended_expressions = {$varsettingsextendedexpressions}
 
 log {
-	destination = $varsettingslogdir
+	destination = {$varsettingslogdir}
 	colourise = yes
 	file = \${logdir}/radius.log
 	syslog_facility = daemon
-	stripped_names = $varsettingsstrippednames
-	auth = $varsettingsauth
-	auth_badpass = $varsettingsauthbadpass
-	auth_goodpass = $varsettingsauthgoodpass
-	msg_goodpass = "$varsettingsauthgoodpassmessage"
-	msg_badpass = "$varsettingsauthbadpassmessage"
+	stripped_names = {$varsettingsstrippednames}
+	auth = {$varsettingsauth}
+	auth_badpass = {$varsettingsauthbadpass}
+	auth_goodpass = {$varsettingsauthgoodpass}
+	msg_goodpass = "{$varsettingsauthgoodpassmessage}"
+	msg_badpass = "{$varsettingsauthbadpassmessage}"
 	msg_denied = "You are already logged in - access denied"
 }
 
 checkrad = \${sbindir}/checkrad
 security {
-	allow_core_dumps = $varsettingsallowcoredumps
-	max_attributes = $varsettingsmaxattributes
-	reject_delay = $varsettingsrejectdelay
+	allow_core_dumps = {$varsettingsallowcoredumps}
+	max_attributes = {$varsettingsmaxattributes}
+	reject_delay = {$varsettingsrejectdelay}
 	status_server = no
 	# Disable this check since it may not be accurate due to how FreeBSD patches OpenSSL
 	allow_vulnerable_openssl = yes
@@ -386,12 +386,12 @@ security {
 
 \$INCLUDE  clients.conf
 thread pool {
-	start_servers = $varsettingsstartservers
-	max_servers = $varsettingsmaxservers
-	min_spare_servers = $varsettingsminspareservers
-	max_spare_servers = $varsettingsmaxspareservers
-	max_queue_size = $varsettingsmaxqueuesize
-	max_requests_per_server = $varsettingsmaxrequestsperserver
+	start_servers = {$varsettingsstartservers}
+	max_servers = {$varsettingsmaxservers}
+	min_spare_servers = {$varsettingsminspareservers}
+	max_spare_servers = {$varsettingsmaxspareservers}
+	max_queue_size = {$varsettingsmaxqueuesize}
+	max_requests_per_server = {$varsettingsmaxrequestsperserver}
 	auto_limit_acct = no
 }
 
@@ -411,7 +411,7 @@ instantiate {
 	expiration
 	logintime
 	### Dis-/Enable sql instatiate
-	$varsqlconfinstantiate
+{$varsqlconfinstantiate}
 }
 \$INCLUDE policy.d/
 \$INCLUDE sites-enabled/
@@ -518,7 +518,7 @@ function freeradius_users_resync($via_rpc = false) {
 				$varuserscheckitemsadditionaloptions = explode("|", ($users['varuserscheckitemsadditionaloptions']));
 				$varusersadditionaloptionscheckitems .= '';
 				foreach ($varuserscheckitemsadditionaloptions as $checkitemtmp) {
-					$varusersadditionaloptionscheckitems .= "$checkitemtmp" . " ";
+					$varusersadditionaloptionscheckitems .= "{$checkitemtmp}" . " ";
 				}
 			}
 
@@ -545,38 +545,38 @@ function freeradius_users_resync($via_rpc = false) {
 					$varuserscheckitem = '';
 				} else {
 					// Add the user attributes to each user.
-					$varuserscheckitem = '"' . $varusersusername . '"' . " $varuserspasswordencryption := " . '"' . $varuserspassword .'"';
+					$varuserscheckitem = '"' . $varusersusername . '"' . " {$varuserspasswordencryption} := " . '"' . $varuserspassword .'"';
 				}
 			// end of check if otp is enabled
 			} else {
 				// if otp is enabled we need to set Auth-Type to accept because password will be checked when the otp script gets executed in reply-item list
-				$varuserscheckitem = '"' . $varusersusername . '"' . " Auth-Type = motp";
+				$varuserscheckitem = "\"{$varusersusername}\" Auth-Type = motp";
 			}
 
 			// Add additional CHECK-ITEMS here. Different formatting in "users" file needed.
 			if ($varuserssimultaneousconnect != '') {
-				$varuserscheckitem .= ", Simultaneous-Use := " . '"' . $varuserssimultaneousconnect . '"';
+				$varuserscheckitem .= ", Simultaneous-Use := \"{$varuserssimultaneousconnect}\"";
 			}
 			if ($varusersexpiration != '') {
-				$varuserscheckitem .= ", Expiration := " . '"' . $varusersexpiration . '"';
+				$varuserscheckitem .= ", Expiration := \"{$varusersexpiration}\"";
 			}
 			if ($varuserslogintime != '') {
-				$varuserscheckitem .= ", Login-Time := " . '"' . $varuserslogintime . '"';
+				$varuserscheckitem .= ", Login-Time := \"{$varuserslogintime}\"";
 			}
 			if ($varusersamountoftime != '') {
-				$varuserscheckitem .= ", Max-" . "$varuserspointoftime" . "-Session := " . "$varusersamountoftime";
+				$varuserscheckitem .= ", Max-{$varuserspointoftime}-Session := {$varusersamountoftime}";
 			}
 			if ($varusersadditionaloptionscheckitems != '') {
-				$varuserscheckitem .= ", $varusersadditionaloptionscheckitems";
+				$varuserscheckitem .= ", {$varusersadditionaloptionscheckitems}";
 			}
 
 			// this is the part for mobile otp
 			if ($users['varusersmotpenable'] == 'on') {
 				$varusersreplyitem .= <<<EOD
 
-	MOTP-Init-Secret = $varusersmotpinitsecret,
-	MOTP-PIN = $varusersmotppin,
-	MOTP-Offset = $varusersmotpoffset
+	MOTP-Init-Secret = {$varusersmotpinitsecret},
+	MOTP-PIN = {$varusersmotppin},
+	MOTP-Offset = {$varusersmotpoffset}
 
 EOD;
 			} else {
@@ -590,7 +590,7 @@ EOD;
 				}
 				$varusersreplyitem .= <<<EOD
 
-	Framed-IP-Address = $varusersframedipaddress
+	Framed-IP-Address = {$varusersframedipaddress}
 
 EOD;
 			}
@@ -600,7 +600,7 @@ EOD;
 				}
 				$varusersreplyitem .= <<<EOD
 
-	Framed-IP-Netmask = $varusersframedipnetmask
+	Framed-IP-Netmask = {$varusersframedipnetmask}
 
 EOD;
 			}
@@ -620,7 +620,7 @@ EOD;
 				}
 				$varusersreplyitem .= <<<EOD
 
-	Session-Timeout := $varuserssessiontimeout
+	Session-Timeout := {$varuserssessiontimeout}
 
 EOD;
 			}
@@ -642,7 +642,7 @@ EOD;
 				}
 				$varusersreplyitem .= <<<EOD
 
-	WISPr-Bandwidth-Max-Up := $varusersmaxbandwidthup
+	WISPr-Bandwidth-Max-Up := {$varusersmaxbandwidthup}
 
 EOD;
 			}
@@ -652,7 +652,7 @@ EOD;
 				}
 				$varusersreplyitem .= <<<EOD
 
-	WISPr-Bandwidth-Max-Down := $varusersmaxbandwidthdown
+	WISPr-Bandwidth-Max-Down := {$varusersmaxbandwidthdown}
 
 EOD;
 			}
@@ -662,7 +662,7 @@ EOD;
 				}
 				$varusersreplyitem .= <<<EOD
 
-	Acct-Interim-Interval := $varusersacctinteriminterval
+	Acct-Interim-Interval := {$varusersacctinteriminterval}
 
 EOD;
 			}
@@ -672,7 +672,7 @@ EOD;
 				}
 				$varusersreplyitem .= <<<EOD
 
-	WISPr-Redirection-URL := $varuserswisprredirectionurl
+	WISPr-Redirection-URL := {$varuserswisprredirectionurl}
 
 EOD;
 			}
@@ -689,30 +689,30 @@ EOD;
 
 EOD;
 				// create limit file - will be always overwritten so we can increase limit from GUI
-				file_put_contents("/var/log/radacct/datacounter/$varusersmaxtotaloctetstimerange/max-octets-$varusersusername", $varusersmaxtotaloctets, LOCK_EX);
+				file_put_contents("/var/log/radacct/datacounter/{$varusersmaxtotaloctetstimerange}/max-octets-{$varusersusername}", $varusersmaxtotaloctets, LOCK_EX);
 				// if used-octets file exist we do NOT overwrite this file!!!
-				if (!file_exists("/var/log/radacct/datacounter/$varusersmaxtotaloctetstimerange/used-octets-$varusersusername")) {
-					file_put_contents("/var/log/radacct/datacounter/$varusersmaxtotaloctetstimerange/used-octets-$varusersusername", "0", LOCK_EX);
+				if (!file_exists("/var/log/radacct/datacounter/{$varusersmaxtotaloctetstimerange}/used-octets-{$varusersusername}")) {
+					file_put_contents("/var/log/radacct/datacounter/{$varusersmaxtotaloctetstimerange}/used-octets-{$varusersusername}", "0", LOCK_EX);
 				}
 			} else {
 				// If an octet limit is NOT set we delete the files for the limit and the counter.
-				unlink_if_exists("/var/log/radacct/datacounter/$varusersmaxtotaloctetstimerange/max-octets-$varusersusername");
-				unlink_if_exists("/var/log/radacct/datacounter/$varusersmaxtotaloctetstimerange/used-octets-$varusersusername*");
+				unlink_if_exists("/var/log/radacct/datacounter/{$varusersmaxtotaloctetstimerange}/max-octets-{$varusersusername}");
+				unlink_if_exists("/var/log/radacct/datacounter/{$varusersmaxtotaloctetstimerange}/used-octets-{$varusersusername}*");
 			}
 			if ($varusersadditionaloptionsreplyitems != '') {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\t$varusersadditionaloptionsreplyitems";
+				$varusersreplyitem .= "\n\t{$varusersadditionaloptionsreplyitems}";
 			}
 
 			// Cosmetic fix - This is just to make a blank new line after each user entry
 			$varusersreplyitem .= "\n\n";
 
 			$conf .= <<<EOD
-$varusersadditionaloptionstop
-$varuserscheckitem
-	$varusersreplyitem
+{$varusersadditionaloptionstop}
+{$varuserscheckitem}
+	{$varusersreplyitem}
 
 EOD;
 		} // endforeach
@@ -800,7 +800,7 @@ function freeradius_authorizedmacs_resync($restart_svc = true, $via_rpc = false)
 				$varmacscheckitemsadditionaloptions = explode("|", ($macs['varmacscheckitemsadditionaloptions']));
 				$varmacsadditionaloptionscheckitems .= '';
 				foreach ($varmacscheckitemsadditionaloptions as $checkitemtmp) {
-					$varmacsadditionaloptionscheckitems .= "$checkitemtmp" . " ";
+					$varmacsadditionaloptionscheckitems .= "{$checkitemtmp} ";
 				}
 			}
 
@@ -812,7 +812,7 @@ function freeradius_authorizedmacs_resync($restart_svc = true, $via_rpc = false)
 				$varmacsreplyitemsadditionaloptions = explode("|", ($macs['varmacsreplyitemsadditionaloptions']));
 				$varmacsadditionaloptionsreplyitems .= '';
 				foreach ($varmacsreplyitemsadditionaloptions as $replyitemtmp) {
-					$varmacsadditionaloptionsreplyitems .= $replyitemtmp . "\n\t";
+					$varmacsadditionaloptionsreplyitems .= "{$replyitemtmp}\n\t";
 				}
 			}
 
@@ -825,24 +825,24 @@ function freeradius_authorizedmacs_resync($restart_svc = true, $via_rpc = false)
 				$varmacscheckitem = '';
 			} else {
 				// Add the user attributes to each user.
-				$varmacscheckitem = "$varmacsaddress" . " Cleartext-Password := " . '"' . $varmacspassword . '"';
+				$varmacscheckitem = "{$varmacsaddress} Cleartext-Password := \"{$varmacspassword}\"";
 			}
 
 			// Add additional CHECK-ITEMS here. Different formatting in "authorized_macs" file needed.
 			if ($varmacssimultaneousconnect != '') {
-				$varmacscheckitem .= ", Simultaneous-Use := " . '"' . $varmacssimultaneousconnect . '"';
+				$varmacscheckitem .= ", Simultaneous-Use := \"{$varmacssimultaneousconnect}\"";
 			}
 			if ($varmacsexpiration != '') {
-				$varmacscheckitem .= ", Expiration := " . '"' . $varmacsexpiration . '"';
+				$varmacscheckitem .= ", Expiration := \"{$varmacsexpiration}\"";
 			}
 			if ($varmacslogintime != '') {
-				$varmacscheckitem .= ", Login-Time := " . '"' . $varmacslogintime . '"';
+				$varmacscheckitem .= ", Login-Time := \"{$varmacslogintime}\"";
 			}
 			if ($varmacsamountoftime != '') {
-				$varmacscheckitem .= ", Max-" . "$varmacspointoftime" . "-Session := " . "$varmacsamountoftime";
+				$varmacscheckitem .= ", Max-{$varmacspointoftime}-Session := {$varmacsamountoftime}";
 			}
 			if ($varmacsadditionaloptionscheckitems != '') {
-				$varmacscheckitem .= ", $varmacsadditionaloptionscheckitems";
+				$varmacscheckitem .= ", {$varmacsadditionaloptionscheckitems}";
 			}
 
 			// Add additional REPLY-ITEMS here. Different formatting in "authorized_macs" file needed.
@@ -852,7 +852,7 @@ function freeradius_authorizedmacs_resync($restart_svc = true, $via_rpc = false)
 				}
 				$varmacsreplyitem .= <<<EOD
 
-	Framed-IP-Address = $varmacsframedipaddress
+	Framed-IP-Address = {$varmacsframedipaddress}
 
 EOD;
 			}
@@ -862,7 +862,7 @@ EOD;
 				}
 				$varmacsreplyitem .= <<<EOD
 
-	Framed-IP-Netmask = $varmacsframedipnetmask
+	Framed-IP-Netmask = {$varmacsframedipnetmask}
 
 EOD;
 			}
@@ -882,7 +882,7 @@ EOD;
 				}
 				$varmacsreplyitem .= <<<EOD
 
-	Session-Timeout := $varmacssessiontimeout
+	Session-Timeout := {$varmacssessiontimeout}
 
 EOD;
 			}
@@ -904,7 +904,7 @@ EOD;
 				}
 				$varmacsreplyitem .= <<<EOD
 
-	WISPr-Bandwidth-Max-Up := $varmacsmaxbandwidthup
+	WISPr-Bandwidth-Max-Up := {$varmacsmaxbandwidthup}
 
 EOD;
 			}
@@ -914,7 +914,7 @@ EOD;
 				}
 				$varmacsreplyitem .= <<<EOD
 
-	WISPr-Bandwidth-Max-Down := $varmacsmaxbandwidthdown
+	WISPr-Bandwidth-Max-Down := {$varmacsmaxbandwidthdown}
 
 EOD;
 			}
@@ -924,7 +924,7 @@ EOD;
 				}
 				$varmacsreplyitem .= <<<EOD
 
-	Acct-Interim-Interval := $varmacsacctinteriminterval
+	Acct-Interim-Interval := {$varmacsacctinteriminterval}
 
 EOD;
 			}
@@ -934,7 +934,7 @@ EOD;
 				}
 				$varmacsreplyitem .= <<<EOD
 
-	WISPr-Redirection-URL := $varmacsswisprredirectionurl
+	WISPr-Redirection-URL := {$varmacsswisprredirectionurl}
 
 EOD;
 			}
@@ -951,30 +951,30 @@ EOD;
 
 EOD;
 				// create limit file - will be always overwritten so we can increase limit from GUI
-				file_put_contents("/var/log/radacct/datacounter/$varmacsmaxtotaloctetstimerange/max-octets-$varmacsaddress", $varmacsmaxtotaloctets, LOCK_EX);
+				file_put_contents("/var/log/radacct/datacounter/{$varmacsmaxtotaloctetstimerange}/max-octets-{$varmacsaddress}", $varmacsmaxtotaloctets, LOCK_EX);
 				// if used-octets file exist we do NOT overwrite this file!!!
-				if (!file_exists("/var/log/radacct/datacounter/$varmacsmaxtotaloctetstimerange/used-octets-$varmacsaddress")) {
-					file_put_contents("/var/log/radacct/datacounter/$varmacsmaxtotaloctetstimerange/used-octets-$varmacsaddress", "0", LOCK_EX);
+				if (!file_exists("/var/log/radacct/datacounter/{$varmacsmaxtotaloctetstimerange}/used-octets-{$varmacsaddress}")) {
+					file_put_contents("/var/log/radacct/datacounter/{$varmacsmaxtotaloctetstimerange}/used-octets-{$varmacsaddress}", "0", LOCK_EX);
 				}
 			} else {
 				// If an octet limit is NOT set we delete the files for the limit and the counter.
-				unlink_if_exists("/var/log/radacct/datacounter/$varmacsmaxtotaloctetstimerange/max-octets-$varmacsaddress");
-				unlink_if_exists("/var/log/radacct/datacounter/$varmacsmaxtotaloctetstimerange/used-octets-$varmacsaddress*");
+				unlink_if_exists("/var/log/radacct/datacounter/{$varmacsmaxtotaloctetstimerange}/max-octets-{$varmacsaddress}");
+				unlink_if_exists("/var/log/radacct/datacounter/{$varmacsmaxtotaloctetstimerange}/used-octets-{$varmacsaddress}*");
 			}
 			if ($varmacsadditionaloptionsreplyitems != '') {
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\t$varmacsadditionaloptionsreplyitems";
+				$varmacsreplyitem .= "\n\t{$varmacsadditionaloptionsreplyitems}";
 			}
 
 			// Cosmetic fix - This is just to make a blank new line after each macs entry
 			$varmacsreplyitem .= "\n\n";
 
 			$conf .= <<<EOD
-$varmacsadditionaloptionstop
-$varmacscheckitem
-	$varmacsreplyitem
+{$varmacsadditionaloptionstop}
+{$varmacscheckitem}
+	{$varmacsreplyitem}
 
 EOD;
 		} // endforeach
@@ -1016,26 +1016,29 @@ function freeradius_clients_resync($restart_svc = true) {
 			if ($item['varclientlogininput'] == '') {
 				$varclientlogin = '### login = !root ###';
 			} else {
-				$varclientlogin = "login = $varclientlogininput";
+				$varclientlogin = "login = {$varclientlogininput}";
 			}
 			if ($item['varclientpasswordinput'] == '') {
 				$varclientpassword = '### password = someadminpass ###';
 			} else {
-				$varclientpassword = "password = $varclientpasswordinput";
+				$varclientpassword = "password = {$varclientpasswordinput}";
 			}
 
 			$conf .= <<<EOD
 
-client "$varclientshortname" {
-	$varclientipversion = $varclientip
-	proto = $varclientproto
-	secret = $varclientsharedsecret
-	require_message_authenticator = $varrequiremessageauthenticator
-	max_connections = $varclientmaxconnections
-	shortname = $varclientshortname
-	nastype = $varclientnastype
-	$varclientlogin
-	$varclientpassword
+client "{$varclientshortname}" {
+	{$varclientipversion} = {$varclientip}
+	proto = {$varclientproto}
+	secret = {$varclientsharedsecret}
+	require_message_authenticator = {$varrequiremessageauthenticator}
+	nas_type = {$varclientnastype}
+	{$varclientlogin}
+	{$varclientpassword}
+	limit {
+		max_connections = {$varclientmaxconnections}
+		lifetime = 0
+		idle_timeout = 30
+	}
 }
 
 EOD;
@@ -1046,6 +1049,11 @@ client pfsense {
 	ipaddr = 127.0.0.1
 	secret = pfsense
 	shortname = pfsense
+	limit {
+		max_connections = 16
+		lifetime = 0
+		idle_timeout = 30
+	}
 }
 
 EOD;
@@ -1202,7 +1210,7 @@ EOD;
 
 	// check if cert issuer of CA and certs match
 	if ($eapconf['vareapconfenablecheckcertissuer'] == 'on') {
-		$vareapconfcheckcertissuer = "check_cert_issuer = " . '"' . "/C=$vareapconfcountry/ST=$vareapconfstate/L=$vareapconfcity/O=$vareapconforganization/emailAddress=$vareapconfemail/CN=$vareapconfcommonname" . '"';
+		$vareapconfcheckcertissuer = "check_cert_issuer = " . '"' . "/C={$vareapconfcountry}/ST={$vareapconfstate}/L={$vareapconfcity}/O={$vareapconforganization}/emailAddress={$vareapconfemail}/CN={$vareapconfcommonname}" . '"';
 	} else {
 		$vareapconfcheckcertissuer = '### check_cert_issuer = "/C=GB/ST=Berkshire/L=Newbury/O=My Company Ltd/emailAddress=test@mycomp.com/CN=myca" ###';
 	}
@@ -1210,13 +1218,13 @@ EOD;
 	$conf .= <<<EOD
 ### EAP
 eap {
-	default_eap_type = $vareapconfdefaulteaptype
-	timer_expire     = $vareapconftimerexpire
-	ignore_unknown_eap_types = $vareapconfignoreunknowneaptypes
-	cisco_accounting_username_bug = $vareapconfciscoaccountingusernamebug
-	max_sessions = $vareapconfmaxsessions
+	default_eap_type = {$vareapconfdefaulteaptype}
+	timer_expire     = {$vareapconftimerexpire}
+	ignore_unknown_eap_types = {$vareapconfignoreunknowneaptypes}
+	cisco_accounting_username_bug = {$vareapconfciscoaccountingusernamebug}
+	max_sessions = {$vareapconfmaxsessions}
 
-	$vareapconfweakeaptypes
+{$vareapconfweakeaptypes}
 
 #	pwd {
 #		group = 19
@@ -1227,40 +1235,40 @@ eap {
 
 	tls-config tls-common {
 		# private_key_password = whatever
-		private_key_file = \${certdir}/$vareapconfprivatekeyfile
-		certificate_file = \${certdir}/$vareapconfcertificatefile
+		private_key_file = \${certdir}/{$vareapconfprivatekeyfile}
+		certificate_file = \${certdir}/{$vareapconfcertificatefile}
 		ca_path = \${confdir}/certs
-		ca_file = \${ca_path}/$vareapconfcafile
+		ca_file = \${ca_path}/{$vareapconfcafile}
 	#	auto_chain = yes
 	#	psk_identity = "test"
 	#	psk_hexphrase = "036363823"
 		dh_file = \${certdir}/dh
 		random_file = /dev/urandom
-		fragment_size = $vareapconffragmentsize
-		include_length = $vareapconfincludelength
+		fragment_size = {$vareapconffragmentsize}
+		include_length = {$vareapconfincludelength}
 		{$check_crl}
-		$vareapconfcheckcertissuer
-		$vareapconfcheckcertcn
+		{$vareapconfcheckcertissuer}
+		{$vareapconfcheckcertcn}
 		cipher_list = "DEFAULT"
 		cipher_server_preference = no
 #		disable_tlsv1_2 = no
 		ecdh_curve = "prime256v1"
 		cache {
-			enable = $vareapconfcacheenablecache
-			lifetime = $vareapconfcachelifetime
-			max_entries = $vareapconfcachemaxentries
+			enable = {$vareapconfcacheenablecache}
+			lifetime = {$vareapconfcachelifetime}
+			max_entries = {$vareapconfcachemaxentries}
 			#name = "EAP module"
 			#persist_dir = "${logdir}/tlscache"
 		}
 		verify {
 	#		skip_if_ocsp_ok = no
 	#		tmpdir = /tmp/radiusd
-	#		client = "/path/to/openssl verify -CApath ${..ca_path} %{TLS-Client-Cert-Filename}"
+	#		client = "/path/to/openssl verify -CApath \${..ca_path} %{TLS-Client-Cert-Filename}"
 		}
 		ocsp {
-			enable = $vareapconfocspenable
-			override_cert_url = $vareapconfocspoverridecerturl
-			url = "$vareapconfocspurl"
+			enable = {$vareapconfocspenable}
+			override_cert_url = {$vareapconfocspoverridecerturl}
+			url = "{$vareapconfocspurl}"
 			# use_nonce = yes
 			# timeout = 0
 			# softfail = no
@@ -1272,53 +1280,23 @@ eap {
 	}
 	ttls {
 		tls = tls-common
-		default_eap_type = $vareapconfttlsdefaulteaptype
-		copy_request_to_tunnel = $vareapconfttlscopyrequesttotunnel
-		include_length = $vareapconfttlsincludelength
+		default_eap_type = {$vareapconfttlsdefaulteaptype}
+		copy_request_to_tunnel = {$vareapconfttlscopyrequesttotunnel}
+		include_length = {$vareapconfttlsincludelength}
 	#	require_client_cert = yes
-		virtual_server = "inner-tunnel"
-		#use_tunneled_reply is deprecated
-		if ($vareapconfttlsusetunneledreply) {
-			update reply {
-				User-Name !* ANY
-				Message-Authenticator !* ANY
-				EAP-Message !* ANY
-				Proxy-State !* ANY
-				MS-MPPE-Encryption-Types !* ANY
-				MS-MPPE-Encryption-Policy !* ANY
-				MS-MPPE-Send-Key !* ANY
-				MS-MPPE-Recv-Key !* ANY
-			}
-			update {
-				&outer.session-state: += &reply:
-			}
-		}
+		virtual_server = "inner-tunnel-ttls"
+		#use_tunneled_reply is deprecated, new method happens in virtual-server
 	}	### end ttls
 	peap {
 		tls = tls-common
-		default_eap_type = $vareapconfpeapdefaulteaptype
-		copy_request_to_tunnel = $vareapconfpeapcopyrequesttotunnel
+		default_eap_type = {$vareapconfpeapdefaulteaptype}
+		copy_request_to_tunnel = {$vareapconfpeapcopyrequesttotunnel}
 	#	proxy_tunneled_request_as_eap = yes
 	#	require_client_cert = yes
-		$vareapconfpeapsoh
+{$vareapconfpeapsoh}
 
-		virtual_server = "inner-tunnel"
-		#use_tunneled_reply is deprecated
-		if ($vareapconfpeapusetunneledreply) {
-			update reply {
-				User-Name !* ANY
-				Message-Authenticator !* ANY
-				EAP-Message !* ANY
-				Proxy-State !* ANY
-				MS-MPPE-Encryption-Types !* ANY
-				MS-MPPE-Encryption-Policy !* ANY
-				MS-MPPE-Send-Key !* ANY
-				MS-MPPE-Recv-Key !* ANY
-			}
-			update {
-				&outer.session-state: += &reply:
-			}
-		}
+		virtual_server = "inner-tunnel-peap"
+		#use_tunneled_reply is deprecated, new method happens in virtual-server
 	}
 	mschapv2 {
 #		send_error = no
@@ -1336,8 +1314,233 @@ eap {
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/eap';
+	/* Remove what could be a symlink first before writing */
+	@unlink_if_exists($filename);
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
+
+	/* Write out TTLS inner tunnel server */
+	$conf = <<<EOD
+
+server inner-tunnel {
+listen {
+	ipaddr = 127.0.0.1
+	port = 18127
+	type = auth
+}
+authorize {
+	filter_username
+#	filter_inner_identity
+	chap
+	mschap
+#	unix
+#	IPASS
+#	ntdomain
+	update control {
+		&Proxy-To-Realm := LOCAL
+	}
+	eap {
+		ok = return
+	}
+	files
+	-sql
+#	smbpasswd
+	-ldap
+#	daily
+	expiration
+	logintime
+	pap
+}
+
+authenticate {
+	Auth-Type PAP {
+		pap
+	}
+	Auth-Type CHAP {
+		chap
+	}
+	Auth-Type MS-CHAP {
+		mschap
+	}
+	mschap
+#	pam
+#	Auth-Type LDAP {
+#		ldap
+#	}
+	eap
+}
+
+session {
+	radutmp
+#	sql
+}
+
+post-auth {
+#       cui-inner
+#	reply_log
+	-sql
+#	ldap
+#	moonshot_host_tid
+#	moonshot_realm_tid
+#	moonshot_coi_tid
+	if ($vareapconfttlsusetunneledreply) {
+		update reply {
+			User-Name !* ANY
+			Message-Authenticator !* ANY
+			EAP-Message !* ANY
+			Proxy-State !* ANY
+			MS-MPPE-Encryption-Types !* ANY
+			MS-MPPE-Encryption-Policy !* ANY
+			MS-MPPE-Send-Key !* ANY
+			MS-MPPE-Recv-Key !* ANY
+		}
+		update {
+			&outer.session-state: += &reply:
+		}
+	}
+
+	Post-Auth-Type REJECT {
+		-sql
+		attr_filter.access_reject
+		update outer.session-state {
+			&Module-Failure-Message := &request:Module-Failure-Message
+		}
+	}
+}
+
+pre-proxy {
+#	files
+#	attr_filter.pre-proxy
+#	pre_proxy_log
+}
+
+post-proxy {
+#	post_proxy_log
+#	attr_filter.post-proxy
+	eap
+}
+
+} # inner-tunnel server block
+
+EOD;
+
+	$filename = FREERADIUS_SITESENABLED . '/inner-tunnel-ttls';
+	/* Remove what could be a symlink first before writing */
+	@unlink_if_exists($filename);
+	file_put_contents($filename, $conf);
+	chmod($filename, 0640);
+
+	/* Write out PEAP inner tunnel server */
+	$conf = <<<EOD
+
+server inner-tunnel {
+listen {
+	ipaddr = 127.0.0.1
+	port = 18128
+	type = auth
+}
+authorize {
+	filter_username
+#	filter_inner_identity
+	chap
+	mschap
+#	unix
+#	IPASS
+#	ntdomain
+	update control {
+		&Proxy-To-Realm := LOCAL
+	}
+	eap {
+		ok = return
+	}
+	files
+	-sql
+#	smbpasswd
+	-ldap
+#	daily
+	expiration
+	logintime
+	pap
+}
+
+authenticate {
+	Auth-Type PAP {
+		pap
+	}
+	Auth-Type CHAP {
+		chap
+	}
+	Auth-Type MS-CHAP {
+		mschap
+	}
+	mschap
+#	pam
+#	Auth-Type LDAP {
+#		ldap
+#	}
+	eap
+}
+
+session {
+	radutmp
+#	sql
+}
+
+post-auth {
+#       cui-inner
+#	reply_log
+	-sql
+#	ldap
+#	moonshot_host_tid
+#	moonshot_realm_tid
+#	moonshot_coi_tid
+	if ($vareapconfpeapusetunneledreply) {
+		update reply {
+			User-Name !* ANY
+			Message-Authenticator !* ANY
+			EAP-Message !* ANY
+			Proxy-State !* ANY
+			MS-MPPE-Encryption-Types !* ANY
+			MS-MPPE-Encryption-Policy !* ANY
+			MS-MPPE-Send-Key !* ANY
+			MS-MPPE-Recv-Key !* ANY
+		}
+		update {
+			&outer.session-state: += &reply:
+		}
+	}
+
+	Post-Auth-Type REJECT {
+		-sql
+		attr_filter.access_reject
+		update outer.session-state {
+			&Module-Failure-Message := &request:Module-Failure-Message
+		}
+	}
+}
+
+pre-proxy {
+#	files
+#	attr_filter.pre-proxy
+#	pre_proxy_log
+}
+
+post-proxy {
+#	post_proxy_log
+#	attr_filter.post-proxy
+	eap
+}
+
+} # inner-tunnel server block
+
+EOD;
+
+	$filename = FREERADIUS_SITESENABLED . '/inner-tunnel-peap';
+	/* Remove what could be a symlink first before writing */
+	@unlink_if_exists($filename);
+	file_put_contents($filename, $conf);
+	chmod($filename, 0640);
+
 
 	if ($restart_svc === true) {
 		restart_service("radiusd");
@@ -1453,35 +1656,35 @@ function freeradius_sqlconf_resync() {
 	$conf .= <<<EOD
 
 sql {
-	database = "$varsqlconfdatabase"
+	database = "{$varsqlconfdatabase}"
 	driver = "rlm_sql_\${database}"
 	dialect = "\${database}"
-	server = "$varsqlconfserver"
-	port = $varsqlconfport
-	login = "$varsqlconflogin"
-	password = "$varsqlconfpassword"
-	radius_db = "$varsqlconfradiusdb"
-	acct_table1 = "$varsqlconfaccttable1"
-	acct_table2 = "$varsqlconfaccttable2"
-	postauth_table = "$varsqlconfpostauthtable"
-	authcheck_table = "$varsqlconfauthchecktable"
-	authreply_table = "$varsqlconfauthreplytable"
-	groupcheck_table = "$varsqlconfgroupchecktable"
-	groupreply_table = "$varsqlconfgroupreplytable"
-	usergroup_table = "$varsqlconfusergrouptable"
-	read_groups = $varsqlconfreadgroups
-	delete_stale_sessions = $varsqlconfdeletestalesessions
-	logfile = $varsqlconfsqltrace
-	read_clients = $varsqlconfreadclients
-	nas_table = "$varsqlconfnastable"
+	server = "{$varsqlconfserver}"
+	port = {$varsqlconfport}
+	login = "{$varsqlconflogin}"
+	password = "{$varsqlconfpassword}"
+	radius_db = "{$varsqlconfradiusdb}"
+	acct_table1 = "{$varsqlconfaccttable1}"
+	acct_table2 = "{$varsqlconfaccttable2}"
+	postauth_table = "{$varsqlconfpostauthtable}"
+	authcheck_table = "{$varsqlconfauthchecktable}"
+	authreply_table = "{$varsqlconfauthreplytable}"
+	groupcheck_table = "{$varsqlconfgroupchecktable}"
+	groupreply_table = "{$varsqlconfgroupreplytable}"
+	usergroup_table = "{$varsqlconfusergrouptable}"
+	read_groups = {$varsqlconfreadgroups}
+	delete_stale_sessions = {$varsqlconfdeletestalesessions}
+	logfile = {$varsqlconfsqltrace}
+	read_clients = {$varsqlconfreadclients}
+	nas_table = "{$varsqlconfnastable}"
 	pool {
 		start = \${thread[pool].start_servers}
 		min = \${thread[pool].min_spare_servers}
-		max = $varsqlconfnumsqlsocks
+		max = {$varsqlconfnumsqlsocks}
 		spare = \${thread[pool].max_spare_servers}
-		uses = $varsqlconfmaxqueries
-		retry_delay = $varsqlconfconnectfailureretrydelay
-		lifetime = $varsqlconflifetime
+		uses = {$varsqlconfmaxqueries}
+		retry_delay = {$varsqlconfconnectfailureretrydelay}
+		lifetime = {$varsqlconflifetime}
 		idle_timeout = 60
 	}
 	group_attribute = "SQL-Group"
@@ -1489,35 +1692,35 @@ sql {
 }
 
 sql sql2 {
-	database = "$varsqlconf2database"
+	database = "{$varsqlconf2database}"
 	driver = "rlm_sql_\${database}"
 	dialect = "\${database}"
-	server = "$varsqlconf2server"
-	port = $varsqlconf2port
-	login = "$varsqlconf2login"
-	password = "$varsqlconf2password"
-	radius_db = "$varsqlconf2radiusdb"
-	acct_table1 = "$varsqlconf2accttable1"
-	acct_table2 = "$varsqlconf2accttable2"
-	postauth_table = "$varsqlconf2postauthtable"
-	authcheck_table = "$varsqlconf2authchecktable"
-	authreply_table = "$varsqlconf2authreplytable"
-	groupcheck_table = "$varsqlconf2groupchecktable"
-	groupreply_table = "$varsqlconf2groupreplytable"
-	usergroup_table = "$varsqlconf2usergrouptable"
-	read_groups = $varsqlconf2readgroups
-	delete_stale_sessions = $varsqlconf2deletestalesessions
-	logfile = $varsqlconf2sqltrace
-	read_clients = $varsqlconf2readclients
-	nas_table = "$varsqlconf2nastable"
+	server = "{$varsqlconf2server}"
+	port = {$varsqlconf2port}
+	login = "{$varsqlconf2login}"
+	password = "{$varsqlconf2password}"
+	radius_db = "{$varsqlconf2radiusdb}"
+	acct_table1 = "{$varsqlconf2accttable1}"
+	acct_table2 = "{$varsqlconf2accttable2}"
+	postauth_table = "{$varsqlconf2postauthtable}"
+	authcheck_table = "{$varsqlconf2authchecktable}"
+	authreply_table = "{$varsqlconf2authreplytable}"
+	groupcheck_table = "{$varsqlconf2groupchecktable}"
+	groupreply_table = "{$varsqlconf2groupreplytable}"
+	usergroup_table = "{$varsqlconf2usergrouptable}"
+	read_groups = {$varsqlconf2readgroups}
+	delete_stale_sessions = {$varsqlconf2deletestalesessions}
+	logfile = {$varsqlconf2sqltrace}
+	read_clients = {$varsqlconf2readclients}
+	nas_table = "{$varsqlconf2nastable}"
 	pool {
 		start = \${thread[pool].start_servers}
 		min = \${thread[pool].min_spare_servers}
-		max = $varsqlconf2numsqlsocks
+		max = {$varsqlconf2numsqlsocks}
 		spare = \${thread[pool].max_spare_servers}
-		uses = $varsqlconf2maxqueries
-		retry_delay = $varsqlconf2connectfailureretrydelay
-		lifetime = $varsqlconf2lifetime
+		uses = {$varsqlconf2maxqueries}
+		retry_delay = {$varsqlconf2connectfailureretrydelay}
+		lifetime = {$varsqlconf2lifetime}
 		idle_timeout = 60
 	}
 	group_attribute = "\${.:instance}-SQL-Group"
@@ -1567,10 +1770,10 @@ function freeradius_serverdefault_resync() {
 	} else {
 		$varmodulesldapenableauthorize = <<<EOD
 
-$varmodulesldap2failover {
+{$varmodulesldap2failover} {
 	ldap
 	# this line adds ldap2 when activated
-	$varmodulesldap2enableauthorize
+	{$varmodulesldap2enableauthorize}
 }
 
 EOD;
@@ -1585,20 +1788,20 @@ EOD;
 
 	// If unchecked then disable authenticate ldap2
 	if (!$arrmodulesldap['varmodulesldapenableauthenticate']) {
-		$varmodulesldapenableauthenticate = <<<EOD;
+		$varmodulesldapenableauthenticate = <<<EOD
 
 	#Auth-Type LDAP {
 		#ldap
-		#$varmodulesldap2enableauthenticate
+		#{$varmodulesldap2enableauthenticate}
 	#}
 
 EOD;
 	} else {
-		$varmodulesldapenableauthenticate = <<<EOD;
+		$varmodulesldapenableauthenticate = <<<EOD
 
 	Auth-Type LDAP {
 		ldap
-		$varmodulesldap2enableauthenticate
+		{$varmodulesldap2enableauthenticate}
 	}
 
 EOD;
@@ -1653,9 +1856,9 @@ EOD;
 	if (($sqlconf['varsqlconfincludeenable'] == 'on') && ($sqlconf['varsqlconfenableauthorize'] == 'Enable')) {
 		$varsqlconfauthorize = <<<EOD
 
-	$varsqlconf2failover {
+	{$varsqlconf2failover} {
 		sql
-		$varsqlconf2authorize
+		{$varsqlconf2authorize}
 	}
 
 EOD;
@@ -1667,9 +1870,9 @@ EOD;
 	if (($sqlconf['varsqlconfincludeenable'] == 'on') && ($sqlconf['varsqlconfenableaccounting'] == 'Enable')) {
 		$varsqlconfaccounting = <<<EOD
 
-	$varsqlconf2failover {
+	{$varsqlconf2failover} {
 		sql
-		$varsqlconf2accounting
+		{$varsqlconf2accounting}
 	}
 
 EOD;
@@ -1681,9 +1884,9 @@ EOD;
 	if (($sqlconf['varsqlconfincludeenable'] == 'on') && ($sqlconf['varsqlconfenablesession'] == 'Enable')) {
 		$varsqlconfsession = <<<EOD
 
-	$varsqlconf2failover {
+	{$varsqlconf2failover} {
 		sql
-		$varsqlconf2session
+		{$varsqlconf2session}
 	}
 
 EOD;
@@ -1695,9 +1898,9 @@ EOD;
 	if (($sqlconf['varsqlconfincludeenable'] == 'on') && ($sqlconf['varsqlconfenablepostauth'] == 'Enable')) {
 		$varsqlconfpostauth = <<<EOD
 
-	$varsqlconf2failover {
+	{$varsqlconf2failover} {
 		sql
-		$varsqlconf2postauth
+		{$varsqlconf2postauth}
 	}
 
 EOD;
@@ -1779,9 +1982,9 @@ EOD;
 			if ($item['varinterfacetype'] == 'detail') {
 				$conf .= <<<EOD
 listen {
-	type = $varinterfacetype
-	$varinterfaceipversion = $varinterfaceip
-	port = $varinterfaceport
+	type = {$varinterfacetype}
+	{$varinterfaceipversion} = {$varinterfaceip}
+	port = {$varinterfaceport}
 	filename = \${radacctdir}/detail-%Y%m%d:%H
 	load_factor = 10
 }
@@ -1795,9 +1998,9 @@ EOD;
 				symlink(FREERADIUS_SITESAVAIL . "/coa", FREERADIUS_SITESENABLED);
 				$conf .= <<<EOD
 listen {
-	type = $varinterfacetype
-	$varinterfaceipversion = $varinterfaceip
-	port = $varinterfaceport
+	type = {$varinterfacetype}
+	{$varinterfaceipversion} = {$varinterfaceip}
+	port = {$varinterfaceport}
 	server = coa
 }
 
@@ -1808,9 +2011,9 @@ EOD;
 			if (($item['varinterfacetype'] == 'auth') || ($item['varinterfacetype'] == 'acct') || ($item['varinterfacetype'] == 'proxy') || ($item['varinterfacetype'] == 'status')) {
 				$conf .= <<<EOD
 listen {
-	type = $varinterfacetype
-	$varinterfaceipversion = $varinterfaceip
-	port = $varinterfaceport
+	type = {$varinterfacetype}
+	{$varinterfaceipversion} = {$varinterfaceip}
+	port = {$varinterfaceport}
 }
 
 EOD;
@@ -1827,7 +2030,7 @@ authorize {
 	preprocess
 #	operator-name
 #	cui
-	$varplainmacauthenable
+{$varplainmacauthenable}
 #	auth_log
 	chap
 	mschap
@@ -1842,9 +2045,9 @@ authorize {
 	}
 #	unix
 	files
-	$varsqlconfauthorize
+{$varsqlconfauthorize}
 #	smbpasswd
-	$varmodulesldapenableauthorize
+{$varmodulesldapenableauthorize}
 	daily
 	weekly
 	monthly
@@ -1875,7 +2078,7 @@ authenticate {
 	digest
 #	pam
 	unix
-	$varmodulesldapenableauthenticate
+{$varmodulesldapenableauthenticate}
 	eap
 #	Auth-Type eap {
 #		eap {
@@ -1890,12 +2093,12 @@ authenticate {
 
 preacct {
 	preprocess
-	$varplainmacpreacctenable
+{$varplainmacpreacctenable}
 #	acct_counters64
 	update request {
 		&FreeRADIUS-Acct-Session-Start-Time = "%{expr: %l - %{%{Acct-Session-Time}:-0} - %{%{Acct-Delay-Time}:-0}}"
 	}
-	$varsettingsacctuniqueenabled
+{$varsettingsacctuniqueenabled}
 #	IPASS
 	suffix
 	ntdomain
@@ -1920,7 +2123,7 @@ accounting {
 	radutmp
 #	sradutmp
 #	main_pool
-	$varsqlconfaccounting
+{$varsqlconfaccounting}
 #	if (noop) {
 #		ok
 #	}
@@ -1934,7 +2137,7 @@ accounting {
 
 session {
 #	radutmp
-	$varsqlconfsession
+	{$varsqlconfsession}
 }
 
 post-auth {
@@ -1949,7 +2152,7 @@ post-auth {
 #	main_pool
 #	cui
 #	reply_log
-	$varsqlconfpostauth
+{$varsqlconfpostauth}
 #	ldap
 	exec
 #	wimax
@@ -1977,7 +2180,7 @@ post-auth {
 	remove_reply_message_if_eap
 	Post-Auth-Type REJECT {
 		# log failed authentications in SQL, too.
-		$varsqlconfpostauthtypereject
+		{$varsqlconfpostauthtypereject}
 		attr_filter.access_reject
 		eap
 		remove_reply_message_if_eap
@@ -2599,11 +2802,11 @@ EOD;
 	} else {
 		// When enabled we put in the default values so there is no empty entry if there is not input from GUI
 		$varmodulesldapdefaultprofile = ($arrmodulesldap['varmodulesldapdefaultprofile'] ?: 'cn=radprofile,ou=dialup,o=My Company Ltd,c=US');
-		$varmodulesldapdefaultprofile = "default_profile = " . '"' . "$varmodulesldapdefaultprofile" . '"';
+		$varmodulesldapdefaultprofile = "default_profile = \"{$varmodulesldapdefaultprofile}\"";
 		$varmodulesldapprofileattribute = ($arrmodulesldap['varmodulesldapprofileattribute'] ?: 'radiusProfileDn');
-		$varmodulesldapprofileattribute = "profile_attribute = " . '"' . "$varmodulesldapprofileattribute" . '"';
+		$varmodulesldapprofileattribute = "profile_attribute = \"{$varmodulesldapprofileattribute}\"";
 		$varmodulesldapaccessattr = ($arrmodulesldap['varmodulesldapaccessattr'] ?: 'dialupAccess');
-		$varmodulesldapaccessattr = "access_attr = " . '"' . "$varmodulesldapaccessattr" . '"';
+		$varmodulesldapaccessattr = "access_attr = \"{$varmodulesldapaccessattr}\"";
 	}
 
 	// When disabled we put this in the file but commented (#) like in the default installation ldap2
@@ -2614,11 +2817,11 @@ EOD;
 	} else {
 		// When enabled we put in the default values so there is no empty entry if there is not input from GUI
 		$varmodulesldap2defaultprofile = ($arrmodulesldap['varmodulesldap2defaultprofile'] ?: 'cn=radprofile,ou=dialup,o=My Company Ltd,c=US');
-		$varmodulesldap2defaultprofile = "default_profile = " . '"' . "$varmodulesldap2defaultprofile" . '"';
+		$varmodulesldap2defaultprofile = "default_profile = \"{$varmodulesldap2defaultprofile}\"";
 		$varmodulesldap2profileattribute = ($arrmodulesldap['varmodulesldap2profileattribute'] ?: 'radiusProfileDn');
-		$varmodulesldap2profileattribute = "profile_attribute = " . '"' . "$varmodulesldap2profileattribute" . '"';
+		$varmodulesldap2profileattribute = "profile_attribute = \"{$varmodulesldap2profileattribute}\"";
 		$varmodulesldap2accessattr = ($arrmodulesldap['varmodulesldap2accessattr'] ?: 'dialupAccess');
-		$varmodulesldap2accessattr = "access_attr = " . '"' . "$varmodulesldap2accessattr" . '"';
+		$varmodulesldap2accessattr = "access_attr = \"{$varmodulesldap2accessattr}\"";
 	}
 
 	// Group membership checking
@@ -2633,17 +2836,17 @@ EOD;
 	} else {
 		// When enabled we put in the default values so there is no empty entry if there is not input from GUI
 		$varmodulesldapgroupnameattribute = ($arrmodulesldap['varmodulesldapgroupnameattribute'] ?: 'cn');
-		$varmodulesldapgroupnameattribute = "name_attribute = $varmodulesldapgroupnameattribute";
+		$varmodulesldapgroupnameattribute = "name_attribute = {$varmodulesldapgroupnameattribute}";
 		$varmodulesldapgroupmembershipfilter = ($arrmodulesldap['varmodulesldapgroupmembershipfilter'] ?: '(|(&(objectClass=GroupOfNames)(member=%{control:Ldap-UserDn}))(&(objectClass=GroupOfUniqueNames)(uniquemember=%{control:Ldap-UserDn})))');
-		$varmodulesldapgroupmembershipfilter = "membership_filter = " . '"' . "$varmodulesldapgroupmembershipfilter" . '"';
+		$varmodulesldapgroupmembershipfilter = "membership_filter = \"{$varmodulesldapgroupmembershipfilter}\"";
 		$varmodulesldapgroupmembershipattribute = ($arrmodulesldap['varmodulesldapgroupmembershipattribute'] ?: 'radiusGroupName');
-		$varmodulesldapgroupmembershipattribute = "membership_attribute = $varmodulesldapgroupmembershipattribute";
+		$varmodulesldapgroupmembershipattribute = "membership_attribute = {$varmodulesldapgroupmembershipattribute}";
 		$varmodulesldapcomparecheckitems = ($arrmodulesldap['varmodulesldapcomparecheckitems'] ?: 'yes');
-		$varmodulesldapcomparecheckitems = "compare_check_items = $varmodulesldapcomparecheckitems";
+		$varmodulesldapcomparecheckitems = "compare_check_items = {$varmodulesldapcomparecheckitems}";
 		$varmodulesldapdoxlat = ($arrmodulesldap['varmodulesldapdoxlat'] ?: 'yes');
-		$varmodulesldapdoxlat = "do_xlat = $varmodulesldapdoxlat";
+		$varmodulesldapdoxlat = "do_xlat = {$varmodulesldapdoxlat}";
 		$varmodulesldapaccessattrusedforallow = ($arrmodulesldap['varmodulesldapaccessattrusedforallow'] ?: 'yes');
-		$varmodulesldapaccessattrusedforallow = "access_attr_used_for_allow = $varmodulesldapaccessattrusedforallow";
+		$varmodulesldapaccessattrusedforallow = "access_attr_used_for_allow = {$varmodulesldapaccessattrusedforallow}";
 	}
 
 	// Group membership checking
@@ -2658,17 +2861,17 @@ EOD;
 	} else {
 		// When enabled we put in the default values so there is no empty entry if there is not input from GUI
 		$varmodulesldap2groupnameattribute = ($arrmodulesldap['varmodulesldap2groupnameattribute'] ?: 'cn');
-		$varmodulesldap2groupnameattribute = "name_attribute = $varmodulesldap2groupnameattribute";
+		$varmodulesldap2groupnameattribute = "name_attribute = {$varmodulesldap2groupnameattribute}";
 		$varmodulesldap2groupmembershipfilter = ($arrmodulesldap['varmodulesldap2groupmembershipfilter'] ?: '(|(&(objectClass=GroupOfNames)(member=%{control:Ldap-UserDn}))(&(objectClass=GroupOfUniqueNames)(uniquemember=%{control:Ldap-UserDn})))');
-		$varmodulesldap2groupmembershipfilter = "membership_filter = " . '"' . "$varmodulesldap2groupmembershipfilter" . '"';
+		$varmodulesldap2groupmembershipfilter = "membership_filter = \"{$varmodulesldap2groupmembershipfilter}\"";
 		$varmodulesldap2groupmembershipattribute = ($arrmodulesldap['varmodulesldap2groupmembershipattribute'] ?: 'radiusGroupName');
-		$varmodulesldap2groupmembershipattribute = "membership_attribute = $varmodulesldap2groupmembershipattribute";
+		$varmodulesldap2groupmembershipattribute = "membership_attribute = {$varmodulesldap2groupmembershipattribute}";
 		$varmodulesldap2comparecheckitems = ($arrmodulesldap['varmodulesldap2comparecheckitems'] ?: 'yes');
-		$varmodulesldap2comparecheckitems = "compare_check_items = $varmodulesldap2comparecheckitems";
+		$varmodulesldap2comparecheckitems = "compare_check_items = {$varmodulesldap2comparecheckitems}";
 		$varmodulesldap2doxlat = ($arrmodulesldap['varmodulesldap2doxlat'] ?: 'yes');
-		$varmodulesldap2doxlat = "do_xlat = $varmodulesldap2doxlat";
+		$varmodulesldap2doxlat = "do_xlat = {$varmodulesldap2doxlat}";
 		$varmodulesldap2accessattrusedforallow = ($arrmodulesldap['varmodulesldap2accessattrusedforallow'] ?: 'yes');
-		$varmodulesldap2accessattrusedforallow = "access_attr_used_for_allow = $varmodulesldap2accessattrusedforallow";
+		$varmodulesldap2accessattrusedforallow = "access_attr_used_for_allow = {$varmodulesldap2accessattrusedforallow}";
 	}
 
 	// Keepalive variables ldap1
@@ -2684,34 +2887,34 @@ EOD;
 	$raddb = FREERADIUS_RADDB;
 	$conf .= <<<EOD
 ldap {
-	server = "$varmodulesldapserver"
-	port = "$varmodulesldapserverport"
-	identity = "$varmodulesldapidentity"
-	password = $varmodulesldappassword
-	base_dn = "$varmodulesldapbasedn"
+	server = "{$varmodulesldapserver}"
+	port = "{$varmodulesldapserverport}"
+	identity = "{$varmodulesldapidentity}"
+	password = {$varmodulesldappassword}
+	base_dn = "{$varmodulesldapbasedn}"
 
 	user {
 		base_dn = "\${..base_dn}"
-		filter = "$varmodulesldapfilter"
-		$varmodulesldapaccessattr
+		filter = "{$varmodulesldapfilter}"
+		{$varmodulesldapaccessattr}
 	}
 	group {
 		base_dn = "\${..base_dn}"
 		filter = '(objectClass=posixGroup)'
-		$varmodulesldapgroupnameattribute
-		$varmodulesldapgroupmembershipfilter
-		$varmodulesldapgroupmembershipattribute
-		$varmodulesldapcomparecheckitems
-		$varmodulesldapdoxlat
-		$varmodulesldapaccessattrusedforallow
+		{$varmodulesldapgroupnameattribute}
+		{$varmodulesldapgroupmembershipfilter}
+		{$varmodulesldapgroupmembershipattribute}
+		{$varmodulesldapcomparecheckitems}
+		{$varmodulesldapdoxlat}
+		{$varmodulesldapaccessattrusedforallow}
 	}
 	profile {
-		filter = "$varmodulesldapbasefilter"
-		$varmodulesldapdefaultprofile
-		$varmodulesldapprofileattribute
+		filter = "{$varmodulesldapbasefilter}"
+		{$varmodulesldapdefaultprofile}
+		{$varmodulesldapprofileattribute}
 	}
 	tls {
-		start_tls = $varmodulesldapstarttls
+		start_tls = {$varmodulesldapstarttls}
 		ca_file = {$raddb}/certs/ca_ldap1_cert.pem
 		ca_path = {$raddb}/certs/
 		certificate_file = {$raddb}/certs/radius_ldap1_cert.crt
@@ -2774,20 +2977,20 @@ ldap {
 	edir_account_policy_check = no
 
 	options {
-		idle = $varmodulesldapkeepaliveidle
-		probes = $varmodulesldapkeepaliveprobes
-		interval = $varmodulesldapkeepaliveinterval
-$varmodulesldapmsadcompatibility
+		idle = {$varmodulesldapkeepaliveidle}
+		probes = {$varmodulesldapkeepaliveprobes}
+		interval = {$varmodulesldapkeepaliveinterval}
+{$varmodulesldapmsadcompatibility}
 		# ldap_debug = 0x0028
-		res_timeout = $varmodulesldaptimeout
-		srv_timelimit = $varmodulesldaptimelimit
-		net_timeout = $varmodulesldapnettimeout
+		res_timeout = {$varmodulesldaptimeout}
+		srv_timelimit = {$varmodulesldaptimelimit}
+		net_timeout = {$varmodulesldapnettimeout}
 	}
 
 	pool {
 		start = 0
-		min = $varmodulesldapldapconnectionsnumber
-		max = $varmodulesldapldapconnectionsnumber
+		min = {$varmodulesldapldapconnectionsnumber}
+		max = {$varmodulesldapldapconnectionsnumber}
 		spare = \${thread[pool].max_spare_servers}
 		uses = 0
 		retry_delay = 30
@@ -2822,40 +3025,40 @@ $varmodulesldapmsadcompatibility
 }
 
 ldap ldap2 {
-	server = "$varmodulesldap2server"
-	port = "$varmodulesldap2serverport"
-	identity = "$varmodulesldap2identity"
-	password = $varmodulesldap2password
-	base_dn = "$varmodulesldap2basedn"
+	server = "{$varmodulesldap2server}"
+	port = "{$varmodulesldap2serverport}"
+	identity = "{$varmodulesldap2identity}"
+	password = {$varmodulesldap2password}
+	base_dn = "{$varmodulesldap2basedn}"
 
 	user {
 		base_dn = "\${..base_dn}"
-		filter = "$varmodulesldap2filter"
-		$varmodulesldap2accessattr
+		filter = "{$varmodulesldap2filter}"
+		{$varmodulesldap2accessattr}
 	}
 	group {
 		base_dn = "\${..base_dn}"
 		filter = '(objectClass=posixGroup)'
-		$varmodulesldap2groupnameattribute
-		$varmodulesldap2groupmembershipfilter
-		$varmodulesldap2groupmembershipattribute
-		$varmodulesldap2comparecheckitems
-		$varmodulesldap2doxlat
-		$varmodulesldap2accessattrusedforallow
+		{$varmodulesldap2groupnameattribute}
+		{$varmodulesldap2groupmembershipfilter}
+		{$varmodulesldap2groupmembershipattribute}
+		{$varmodulesldap2comparecheckitems}
+		{$varmodulesldap2doxlat}
+		{$varmodulesldap2accessattrusedforallow}
 	}
 	profile {
-		filter = "$varmodulesldap2basefilter"
-		$varmodulesldap2defaultprofile
-		$varmodulesldap2profileattribute
+		filter = "{$varmodulesldap2basefilter}"
+		{$varmodulesldap2defaultprofile}
+		{$varmodulesldap2profileattribute}
 	}
 	tls {
-		start_tls = $varmodulesldap2starttls
+		start_tls = {$varmodulesldap2starttls}
 		ca_file = {$raddb}/certs/ca_ldap2_cert.pem
 		ca_path = {$raddb}/certs/
 		certificate_file = {$raddb}/certs/radius_ldap2_cert.crt
 		private_key_file = {$raddb}/certs/radius_ldap2_cert.key
 		random_file = /dev/urandom
-		require_cert = "$varmodulesldap2requirecert"
+		require_cert = "{$varmodulesldap2requirecert}"
 	}
 
 #	valuepair_attribute = 'radiusAttribute'
@@ -2912,19 +3115,19 @@ ldap ldap2 {
 	edir_account_policy_check = no
 
 	options {
-		idle = $varmodulesldap2keepaliveidle
-		probes = $varmodulesldap2keepaliveprobes
-		interval = $varmodulesldap2keepaliveinterval
-$varmodulesldap2msadcompatibility
+		idle = {$varmodulesldap2keepaliveidle}
+		probes = {$varmodulesldap2keepaliveprobes}
+		interval = {$varmodulesldap2keepaliveinterval}
+{$varmodulesldap2msadcompatibility}
 		# ldap_debug = 0x0028
-		res_timeout = $varmodulesldap2timeout
-		srv_timelimit = $varmodulesldap2timelimit
-		net_timeout = $varmodulesldap2nettimeout
+		res_timeout = {$varmodulesldap2timeout}
+		srv_timelimit = {$varmodulesldap2timelimit}
+		net_timeout = {$varmodulesldap2nettimeout}
 	}
 	pool {
 		start = 0
-		min = $varmodulesldap2ldapconnectionsnumber
-		max = $varmodulesldap2ldapconnectionsnumber
+		min = {$varmodulesldap2ldapconnectionsnumber}
+		max = {$varmodulesldap2ldapconnectionsnumber}
 		spare = \${thread[pool].max_spare_servers}
 		uses = 0
 		retry_delay = 30
@@ -3105,7 +3308,7 @@ function freeradius_motp_resync() {
 
 PATH=\$PATH:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 
-alias checksum=$varsettingsmotpchecksumtype
+alias checksum={$varsettingsmotpchecksumtype}
 have_md5="true"
 
 # ensure aliases are expanded by bash
@@ -3139,7 +3342,7 @@ OFFSET=`echo -n "\$5" | sed 's/[^0-9-]/0/g' `
 EPOCHTIME=`date +%s` ; EPOCHTIME=`chop \$EPOCHTIME`
 
 # delete old logins
-find /var/log/motp/cache -type f -cmin +$varsettingsmotpdeleteoldpasswords | xargs rm 2>/dev/null
+find /var/log/motp/cache -type f -cmin +{$varsettingsmotpdeleteoldpasswords} | xargs rm 2>/dev/null
 
 if [ -e "/var/log/motp/cache/\$PASSWD" ]; then
 	echo "FAIL"
@@ -3148,17 +3351,17 @@ if [ -e "/var/log/motp/cache/\$PASSWD" ]; then
 fi
 
 # account locked?
-if [ "`cat /var/log/motp/users/\$USERNAME 2>/dev/null`" == "$varsettingsmotppasswordattempts" ]; then
+if [ "`cat /var/log/motp/users/\$USERNAME 2>/dev/null`" == "{$varsettingsmotppasswordattempts}" ]; then
 	echo "FAIL"
 	logger -f /var/log/system.log "FreeRADIUS: Authentication failed! Too many wrong password attempts. User is locked! To unlock delete /var/log/motp/users/\$USERNAME"
 	exit 13
 fi
 
 I=0
-EPOCHTIME=`expr \$EPOCHTIME - $varsettingsmotptimespan`
+EPOCHTIME=`expr \$EPOCHTIME - {$varsettingsmotptimespan}`
 EPOCHTIME=`expr \$EPOCHTIME + \$OFFSET`
-while [ \$I -lt $varsettingsmotptimespanbeforeafter ] ; do # `$varsettingsmotptimespan * 10` seconds before and after
-	OTP=`printf \$EPOCHTIME\$SECRET\$PIN|checksum|cut -b $varsettingsmotptokenlength`
+while [ \$I -lt {$varsettingsmotptimespanbeforeafter} ] ; do # `$varsettingsmotptimespan * 10` seconds before and after
+	OTP=`printf \$EPOCHTIME\$SECRET\$PIN|checksum|cut -b {$varsettingsmotptokenlength}`
 	if [ "\$OTP" = "\$PASSWD" ] ; then
 		touch /var/log/motp/cache/\$OTP || { echo "FAIL! Need write-access to /var/log/motp";logger -f /var/log/system.log "FreeRADIUS: Mobile-One-Time-Password - need write-access to /var/log/motp/cache"; exit 17; }
 		echo "ACCEPT"
