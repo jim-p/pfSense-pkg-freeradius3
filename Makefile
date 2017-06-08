@@ -1,14 +1,14 @@
 # $FreeBSD$
 
 PORTNAME=	pfSense-pkg-freeradius3
-PORTVERSION=	2.0
+PORTVERSION=	0.1
 CATEGORIES=	net
 MASTER_SITES=	# empty
 DISTFILES=	# empty
 EXTRACT_ONLY=	# empty
 
 MAINTAINER=	coreteam@pfsense.org
-COMMENT=	pfSense package freeradius3
+COMMENT=	FreeRADIUS 3.x package for pfSense
 
 LICENSE=	APACHE20
 
