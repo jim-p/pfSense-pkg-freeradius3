@@ -38,6 +38,14 @@ global $bash_path;
 $bash_path = FREERADIUS_BASE . "/bin/bash";
 define('FREERADIUS_LIB', FREERADIUS_BASE . '/lib');
 define('FREERADIUS_ETC', FREERADIUS_BASE . '/etc');
+define('FREERADIUS_RADDB', FREERADIUS_ETC . '/raddb');
+define('FREERADIUS_CERTS', FREERADIUS_RADDB . '/certs');
+define('FREERADIUS_SCRIPTS', FREERADIUS_RADDB . '/scripts');
+define('FREERADIUS_MODSAVAIL', FREERADIUS_RADDB . '/mods-available');
+define('FREERADIUS_MODSENABLED', FREERADIUS_RADDB . '/mods-enabled');
+define('FREERADIUS_SITESAVAIL', FREERADIUS_RADDB . '/sites-available');
+define('FREERADIUS_SITESENABLED', FREERADIUS_RADDB . '/sites-enabled');
+
 
 /*
  * List of functions that directly call restart_service("radiusd")
@@ -138,11 +146,11 @@ function freeradius_install_command() {
 	}
 
 	// Previous package versions were creating a symlink targeting itself here
-	if (is_link(FREERADIUS_ETC . "/raddb")) {
-		@unlink(FREERADIUS_ETC . "/raddb");
+	if (is_link(FREERADIUS_RADDB)) {
+		@unlink(FREERADIUS_RADDB);
 	}
-	safe_mkdir(FREERADIUS_ETC . "/raddb/scripts");
-	freeradius_chown_recursive(FREERADIUS_ETC . "/raddb");
+	safe_mkdir(FREERADIUS_SCRIPTS . "/scripts");
+	freeradius_chown_recursive(FREERADIUS_RADDB);
 	freeradius_chown_recursive("/var/log/radacct");
 	$frlib = freeradius_get_libdir();
 	if (is_dir($frlib)) {
@@ -150,21 +158,21 @@ function freeradius_install_command() {
 	}
 
 	// Disable virtual-server we do not need by default
-	unlink_if_exists(FREERADIUS_ETC . "/raddb/sites-enabled/control-socket");
-	unlink_if_exists(FREERADIUS_ETC . "/raddb/sites-enabled/inner-tunnel");
+	unlink_if_exists(FREERADIUS_SITESENABLED . "/control-socket");
+	unlink_if_exists(FREERADIUS_SITESENABLED . "/inner-tunnel");
 
 	// Remove leftovers of the built-in certificate manager
 	$exts = array("pem", "der", "csr", "crt", "key", "p12", "cnf");
 	foreach ($exts as $ext) {
-		unlink_if_exists(FREERADIUS_ETC . "/raddb/certs/ca.{$ext}");
-		unlink_if_exists(FREERADIUS_ETC . "/raddb/certs/server.{$ext}");
-		unlink_if_exists(FREERADIUS_ETC . "/raddb/certs/client.{$ext}");
+		unlink_if_exists(FREERADIUS_CERTS . "/ca.{$ext}");
+		unlink_if_exists(FREERADIUS_CERTS . "/server.{$ext}");
+		unlink_if_exists(FREERADIUS_CERTS . "/client.{$ext}");
 	}
-	unlink_if_exists(FREERADIUS_ETC . "/raddb/certs/serial*");
-	unlink_if_exists(FREERADIUS_ETC . "/raddb/certs/index*");
-	unlink_if_exists(FREERADIUS_ETC . "/raddb/certs/client.tar");
-	// unlink_if_exists(FREERADIUS_ETC . "/raddb/certs/bootstrap");
-	unlink_if_exists(FREERADIUS_ETC . "/raddb/certs/pfsense_cert_mgr");
+	unlink_if_exists(FREERADIUS_CERTS . "/serial*");
+	unlink_if_exists(FREERADIUS_CERTS . "/index*");
+	unlink_if_exists(FREERADIUS_CERTS . "/client.tar");
+	// unlink_if_exists(FREERADIUS_CERTS . "/bootstrap");
+	unlink_if_exists(FREERADIUS_CERTS . "/pfsense_cert_mgr");
 
 	// Update configuration from old versions
 	freeradius_upgrade_config();
@@ -313,8 +321,8 @@ function freeradius_settings_resync($restart_svc = true) {
 		$varsqlconfinstantiate = "{$varsqlconf2failover} {" . "\n\t\tsql" . "\n\t\t{$varsqlconf2instantiate}" . "\n\t}";
 	} else {
 		/* Remove the sql files from the active modules directory when they are not needed. */
-		@unlink_if_exists(FREERADIUS_ETC . '/raddb/mods-enabled/sql');
-		@unlink_if_exists(FREERADIUS_ETC . '/raddb/mods-enabled/sqlcounter');
+		@unlink_if_exists(FREERADIUS_MODSENABLED . '/sql');
+		@unlink_if_exists(FREERADIUS_MODSENABLED . '/sqlcounter');
 		$varsqlconf2failover = '';
 		$varsqlconfinstantiate = '#sql';
 	}
@@ -359,7 +367,7 @@ extended_expressions = $varsettingsextendedexpressions
 EOD;
 
 	// Deletes virtual-server coa by default. Will be re-enabled if there is an interface-type "coa"
-	unlink_if_exists(FREERADIUS_ETC . "/raddb/sites-enabled/coa");
+	unlink_if_exists(FREERADIUS_SITESENABLED . "/coa");
 
 	if (is_array($config['installedpackages']['freeradiusinterfaces']['config'])) {
 		$arrinterfaces = $config['installedpackages']['freeradiusinterfaces']['config'];
@@ -391,7 +399,7 @@ EOD;
 			// if interface-type = coa
 			if ($item['varinterfacetype'] == 'coa') {
 			// Enables virtual-server coa because interface-type is coa
-				symlink(FREERADIUS_ETC . "/raddb/sites-available/coa", FREERADIUS_ETC . "/raddb/sites-enabled/");
+				symlink(FREERADIUS_SITESAVAIL . "/coa", FREERADIUS_SITESENABLED);
 				$conf .= <<<EOD
 listen {
 	type = $varinterfacetype
@@ -472,7 +480,7 @@ instantiate {
 \$INCLUDE sites-enabled/
 EOD;
 
-	file_put_contents(FREERADIUS_ETC . '/raddb/radiusd.conf', $conf);
+	file_put_contents(FREERADIUS_RADDB . '/radiusd.conf', $conf);
 
 	// freeradius_sqlconf_resync() is pointing to this function because we need
 	// to run freeradius_serverdefault_resync() and after that restart freeradius.
@@ -692,7 +700,7 @@ function freeradius_users_resync($via_rpc = false) {
 					$varusersreplyitem .= ",";
 				}
 				// create exec script
-				$varusersreplyitem .= "\n\tExec-Program-Wait = " . '"/bin/sh ' . FREERADIUS_ETC . '/raddb/scripts/datacounter_auth.sh ' . "$varusersusername $varusersmaxtotaloctetstimerange" . '"';
+				$varusersreplyitem .= "\n\tExec-Program-Wait = " . '"/bin/sh ' . FREERADIUS_SCRIPTS . '/datacounter_auth.sh ' . "$varusersusername $varusersmaxtotaloctetstimerange" . '"';
 				// create limit file - will be always overwritten so we can increase limit from GUI
 				file_put_contents("/var/log/radacct/datacounter/$varusersmaxtotaloctetstimerange/max-octets-$varusersusername", $varusersmaxtotaloctets, LOCK_EX);
 				// if used-octets file exist we do NOT overwrite this file!!!
@@ -722,7 +730,7 @@ EOD;
 		} // endforeach
 	} // endif
 
-	$filename = FREERADIUS_ETC . '/raddb/users';
+	$filename = FREERADIUS_RADDB . '/users';
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
 
@@ -910,7 +918,7 @@ function freeradius_authorizedmacs_resync($restart_svc = true, $via_rpc = false)
 					$varmacsreplyitem .= ",";
 				}
 				//create exec script
-				$varmacsreplyitem .= "\n\tExec-Program-Wait = " . '"/bin/sh ' . FREERADIUS_ETC . '/raddb/scripts/datacounter_auth.sh ' . "$varmacsaddress $varmacsmaxtotaloctetstimerange" . '"';
+				$varmacsreplyitem .= "\n\tExec-Program-Wait = " . '"/bin/sh ' . FREERADIUS_SCRIPTS . '/datacounter_auth.sh ' . "$varmacsaddress $varmacsmaxtotaloctetstimerange" . '"';
 				// create limit file - will be always overwritten so we can increase limit from GUI
 				file_put_contents("/var/log/radacct/datacounter/$varmacsmaxtotaloctetstimerange/max-octets-$varmacsaddress", $varmacsmaxtotaloctets, LOCK_EX);
 				// if used-octets file exist we do NOT overwrite this file!!!
@@ -940,7 +948,7 @@ EOD;
 		} // endforeach
 	} // endif
 
-	$filename = FREERADIUS_ETC . '/raddb/authorized_macs';
+	$filename = FREERADIUS_RADDB . '/authorized_macs';
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
 
@@ -1011,7 +1019,7 @@ client pfsense {
 EOD;
 	}
 
-	file_put_contents(FREERADIUS_ETC . '/raddb/clients.conf', $conf);
+	file_put_contents(FREERADIUS_RADDB . '/clients.conf', $conf);
 
 	freeradius_sync_on_changes();
 	if ($restart_svc === true) {
@@ -1080,10 +1088,10 @@ function freeradius_eapconf_resync($restart_svc = true) {
 	// This is for enable/disbable MS SoH in EAP-PEAP and the virtuial-server "soh-server"
 	if ($eapconf['vareapconfpeapsohenable'] == 'Enable') {
 		$vareapconfpeapsoh = 'soh = yes' . "\n\t\t\tsoh_virtual_server = " . '"' . "soh-server" . '"';
-		symlink(FREERADIUS_ETC . "/raddb/sites-available/soh", FREERADIUS_ETC . "/raddb/sites-enabled/");
+		symlink(FREERADIUS_SITESAVAIL . "/soh", FREERADIUS_SITESENABLED);
 	} else {
 		$vareapconfpeapsoh = '### MS SoH Server is disabled ###';
-		unlink_if_exists(FREERADIUS_ETC . "/raddb/sites-enabled/soh");
+		unlink_if_exists(FREERADIUS_SITESENABLED . "/soh");
 	}
 
 
@@ -1092,8 +1100,8 @@ function freeradius_eapconf_resync($restart_svc = true) {
 	$ca_cert = lookup_ca($eapconf["ssl_ca_cert"]);
 	if ($ca_cert != false) {
 		if (base64_decode($ca_cert['prv'])) {
-			file_put_contents(FREERADIUS_ETC . "/raddb/certs/ca_key.pem", base64_decode($ca_cert['prv']));
-			$conf['ssl_ca_key'] = FREERADIUS_ETC . '/raddb/certs/ca_key.pem';
+			file_put_contents(FREERADIUS_CERTS . "/ca_key.pem", base64_decode($ca_cert['prv']));
+			$conf['ssl_ca_key'] = FREERADIUS_CERTS . '/ca_key.pem';
 		}
 
 		if (base64_decode($ca_cert['crt'])) {
@@ -1104,23 +1112,23 @@ function freeradius_eapconf_resync($restart_svc = true) {
 			} else {
 				$check_crl="check_crl = no";
 			}
-			file_put_contents(FREERADIUS_ETC . "/raddb/certs/ca_cert.pem", base64_decode($ca_cert['crt']) . "\n" . $crl);
-			$conf['ssl_ca_cert'] = FREERADIUS_ETC . "/raddb/certs/ca_cert.pem";
+			file_put_contents(FREERADIUS_CERTS . "/ca_cert.pem", base64_decode($ca_cert['crt']) . "\n" . $crl);
+			$conf['ssl_ca_cert'] = FREERADIUS_CERTS . "/ca_cert.pem";
 		}
 
 		$svr_cert = lookup_cert($eapconf["ssl_server_cert"]);
 		if ($svr_cert != false) {
 			if (base64_decode($svr_cert['prv'])) {
-				file_put_contents(FREERADIUS_ETC . "/raddb/certs/server_key.pem", base64_decode($svr_cert['prv']));
-				$conf['ssl_key'] = FREERADIUS_ETC . '/raddb/certs/server_key.pem';
+				file_put_contents(FREERADIUS_CERTS . "/server_key.pem", base64_decode($svr_cert['prv']));
+				$conf['ssl_key'] = FREERADIUS_CERTS . '/server_key.pem';
 			}
 		}
 		if (base64_decode($svr_cert['crt'])) {
-			file_put_contents(FREERADIUS_ETC . "/raddb/certs/server_cert.pem", base64_decode($svr_cert['crt']));
-			$conf['ssl_server_cert'] = FREERADIUS_ETC . "/raddb/certs/server_cert.pem";
+			file_put_contents(FREERADIUS_CERTS . "/server_cert.pem", base64_decode($svr_cert['crt']));
+			$conf['ssl_server_cert'] = FREERADIUS_CERTS . "/server_cert.pem";
 		}
 
-		$conf['ssl_cert_dir'] = FREERADIUS_ETC . '/raddb/certs';
+		$conf['ssl_cert_dir'] = FREERADIUS_CERTS;
 	} else {
 		file_notice("FreeRADIUS", gettext("Cannot create server certificates. Visit Services &gt; FreeRADIUS &gt; EAP tab and configure server certificates in the 'Certificates for TLS' section."));
 	}
@@ -1131,13 +1139,13 @@ function freeradius_eapconf_resync($restart_svc = true) {
 
 	// generate new DH and RANDOM file if needed
 	// use openvpn_create_dhparams() from openvpn.inc to generate DH params
-	if (!file_exists(FREERADIUS_ETC . "/raddb/certs/dh")) {
-		log_error("freeRADIUS: Creating new DH file in " . FREERADIUS_ETC . "/raddb/certs");
-		file_put_contents(FREERADIUS_ETC . "/raddb/certs/dh", openvpn_create_dhparams('1024'), LOCK_EX);
+	if (!file_exists(FREERADIUS_CERTS . "/dh")) {
+		log_error("freeRADIUS: Creating new DH file in " . FREERADIUS_CERTS);
+		file_put_contents(FREERADIUS_ETC . "/dh", openvpn_create_dhparams('1024'), LOCK_EX);
 	}
-	if (!file_exists(FREERADIUS_ETC . "/raddb/certs/random")) {
-		log_error("freeRADIUS: Creating new random file in " . FREERADIUS_ETC . "/raddb/certs");
-		mwexec("/bin/dd if=/dev/urandom of=" . FREERADIUS_ETC . "/raddb/certs/random count=10");
+	if (!file_exists(FREERADIUS_CERTS . "/random")) {
+		log_error("freeRADIUS: Creating new random file in " . FREERADIUS_CERTS);
+		mwexec("/bin/dd if=/dev/urandom of=" . FREERADIUS_CERTS . "/random count=10");
 	}
 
 	// check if the common name of the certificate must match the username
@@ -1222,7 +1230,7 @@ function freeradius_eapconf_resync($restart_svc = true) {
 	}
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/mods-enabled/eap';
+	$filename = FREERADIUS_MODSENABLED . '/eap';
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
 
@@ -1420,14 +1428,14 @@ sql sql2 {
 }
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/mods-enabled/sql';
+	$filename = FREERADIUS_MODSENABLED . '/sql';
 	/* Remove what could be a symlink first before writing */
 	@unlink_if_exists($filename);
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
 
 	/* Add a symlink to the stock sql counter */
-	symlink( FREERADIUS_ETC . '/raddb/mods-available/sqlcounter' , FREERADIUS_ETC . '/raddb/mods-enabled/sqlcounter' );
+	symlink( FREERADIUS_MODSAVAIL . '/sqlcounter' , FREERADIUS_MODSENABLED . '/sqlcounter' );
 
 	// We don't need a restart at this time because there are
 	// additional changes needed in freeradius_settings_resync()
@@ -2269,7 +2277,7 @@ post-proxy {
 }
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/sites-available/default';
+	$filename = FREERADIUS_SITESAVAIL . '/default';
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
 
@@ -2610,7 +2618,7 @@ counter forever {
 }
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/mods-enabled/counter';
+	$filename = FREERADIUS_MODSENABLED . '/counter';
 	/* Remove what could be a symlink first before writing */
 	@unlink_if_exists($filename);
 	file_put_contents($filename, $conf);
@@ -2658,7 +2666,7 @@ mschap {
 }
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/modules-enabled/mschap';
+	$filename = FREERADIUS_MODSENABLED . '/mschap';
 	/* Remove what could be a symlink first before writing */
 	@unlink_if_exists($filename);
 	file_put_contents($filename, $conf);
@@ -2707,7 +2715,7 @@ realm ntdomain {
 }
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/mods-enabled/realm';
+	$filename = FREERADIUS_MODSENABLED . '/realm';
 	/* Remove what could be a symlink first before writing */
 	@unlink_if_exists($filename);
 	file_put_contents($filename, $conf);
@@ -2763,27 +2771,27 @@ function freeradius_modulesldap_resync($restart_svc = true) {
 		$ca_cert = lookup_ca($arrmodulesldap["ssl_ca_cert1"]);
 		if ($ca_cert != false) {
 			if (base64_decode($ca_cert['prv'])) {
-				file_put_contents(FREERADIUS_ETC . "/raddb/certs/ca_ldap1_key.pem", base64_decode($ca_cert['prv']));
-				$conf['ssl_ca_key'] = FREERADIUS_ETC . '/raddb/certs/ca_ldap1_key.pem';
+				file_put_contents(FREERADIUS_CERTS . "/ca_ldap1_key.pem", base64_decode($ca_cert['prv']));
+				$conf['ssl_ca_key'] = FREERADIUS_CERTS . '/ca_ldap1_key.pem';
 			}
 			if (base64_decode($ca_cert['crt'])) {
-				file_put_contents(FREERADIUS_ETC . "/raddb/certs/ca_ldap1_cert.pem", base64_decode($ca_cert['crt']));
-				$conf['ssl_ca_cert1'] = FREERADIUS_ETC . "/raddb/certs/ca_ldap1_cert.pem";
+				file_put_contents(FREERADIUS_CERTS . "/ca_ldap1_cert.pem", base64_decode($ca_cert['crt']));
+				$conf['ssl_ca_cert1'] = FREERADIUS_CERTS . "/ca_ldap1_cert.pem";
 			}
 
 			$svr_cert = lookup_cert($arrmodulesldap["ssl_server_cert1"]);
 			if ($svr_cert != false) {
 				if (base64_decode($svr_cert['prv'])) {
-					file_put_contents(FREERADIUS_ETC . "/raddb/certs/radius_ldap1_cert.key", base64_decode($svr_cert['prv']));
-					$conf['ssl_key'] = FREERADIUS_ETC . '/raddb/certs/radius_ldap1_cert.key';
+					file_put_contents(FREERADIUS_CERTS . "/radius_ldap1_cert.key", base64_decode($svr_cert['prv']));
+					$conf['ssl_key'] = FREERADIUS_CERTS . '/radius_ldap1_cert.key';
 				}
 			}
 			if (base64_decode($svr_cert['crt'])) {
-				file_put_contents(FREERADIUS_ETC . "/raddb/certs/radius_ldap1_cert.crt", base64_decode($svr_cert['crt']));
-				$conf['ssl_server_cert1'] = FREERADIUS_ETC . "/raddb/certs/radius_ldap1_cert.crt";
+				file_put_contents(FREERADIUS_CERTS . "/radius_ldap1_cert.crt", base64_decode($svr_cert['crt']));
+				$conf['ssl_server_cert1'] = FREERADIUS_CERTS . "/radius_ldap1_cert.crt";
 			}
 
-			$conf['ssl_cert_dir'] = FREERADIUS_ETC . '/raddb/certs';
+			$conf['ssl_cert_dir'] = FREERADIUS_CERTS;
 		}
 		$varmodulesldapstarttls = "yes";
 	} else {
@@ -2799,27 +2807,27 @@ function freeradius_modulesldap_resync($restart_svc = true) {
 		$ca_cert = lookup_ca($arrmodulesldap["ssl_ca_cert2"]);
 		if ($ca_cert != false) {
 			if (base64_decode($ca_cert['prv'])) {
-				file_put_contents(FREERADIUS_ETC . "/raddb/certs/ca_ldap2_key.pem", base64_decode($ca_cert['prv']));
-				$conf['ssl_ca_key'] = FREERADIUS_ETC . '/raddb/certs/ca_ldap2_key.pem';
+				file_put_contents(FREERADIUS_CERTS . "/ca_ldap2_key.pem", base64_decode($ca_cert['prv']));
+				$conf['ssl_ca_key'] = FREERADIUS_CERTS . '/ca_ldap2_key.pem';
 			}
 			if (base64_decode($ca_cert['crt'])) {
-				file_put_contents(FREERADIUS_ETC . "/raddb/certs/ca_ldap2_cert.pem", base64_decode($ca_cert['crt']));
-				$conf['ssl_ca_cert2'] = FREERADIUS_ETC . "/raddb/certs/ca_ldap2_cert.pem";
+				file_put_contents(FREERADIUS_CERTS . "/ca_ldap2_cert.pem", base64_decode($ca_cert['crt']));
+				$conf['ssl_ca_cert2'] = FREERADIUS_CERTS . "/ca_ldap2_cert.pem";
 			}
 
 			$svr_cert = lookup_cert($arrmodulesldap["ssl_server_cert2"]);
 			if ($svr_cert != false) {
 				if (base64_decode($svr_cert['prv'])) {
-					file_put_contents(FREERADIUS_ETC . "/raddb/certs/radius_ldap2_cert.key", base64_decode($svr_cert['prv']));
-					$conf['ssl_key'] = FREERADIUS_ETC . '/raddb/certs/radius_ldap2_cert.key';
+					file_put_contents(FREERADIUS_CERTS . "/radius_ldap2_cert.key", base64_decode($svr_cert['prv']));
+					$conf['ssl_key'] = FREERADIUS_CERTS . '/radius_ldap2_cert.key';
 				}
 			}
 			if (base64_decode($svr_cert['crt'])) {
-				file_put_contents(FREERADIUS_ETC . "/raddb/certs/radius_ldap2_cert.crt", base64_decode($svr_cert['crt']));
-				$conf['ssl_server_cert2'] = FREERADIUS_ETC . "/raddb/certs/radius_ldap2_cert.crt";
+				file_put_contents(FREERADIUS_CERTS . "/radius_ldap2_cert.crt", base64_decode($svr_cert['crt']));
+				$conf['ssl_server_cert2'] = FREERADIUS_CERTS . "/radius_ldap2_cert.crt";
 			}
 
-			$conf['ssl_cert_dir'] = FREERADIUS_ETC . '/raddb/certs';
+			$conf['ssl_cert_dir'] = FREERADIUS_CERTS;
 		}
 		$varmodulesldap2starttls = "yes";
 	} else {
@@ -2875,20 +2883,20 @@ function freeradius_modulesldap_resync($restart_svc = true) {
 	// Group membership checking
 	// When disabled we put this in the file but commented (#) like in the default installation ldap1
 	if (!$arrmodulesldap['varmodulesldapgroupenable']) {
-		$varmodulesldapgroupnameattribute = '### groupname_attribute = cn ###';
-		$varmodulesldapgroupmembershipfilter = '### groupmembership_filter = "(|(&(objectClass=GroupOfNames)(member=%{control:Ldap-UserDn}))(&(objectClass=GroupOfUniqueNames)(uniquemember=%{control:Ldap-UserDn})))" ###';
-		$varmodulesldapgroupmembershipattribute = '### groupmembership_attribute = radiusGroupName ###';
+		$varmodulesldapgroupnameattribute = '### name_attribute = cn ###';
+		$varmodulesldapgroupmembershipfilter = '### membership_filter = "(|(&(objectClass=GroupOfNames)(member=%{control:Ldap-UserDn}))(&(objectClass=GroupOfUniqueNames)(uniquemember=%{control:Ldap-UserDn})))" ###';
+		$varmodulesldapgroupmembershipattribute = '### membership_attribute = radiusGroupName ###';
 		$varmodulesldapcomparecheckitems = '### compare_check_items = yes ###';
 		$varmodulesldapdoxlat = '### do_xlat = yes ###';
 		$varmodulesldapaccessattrusedforallow = '### access_attr_used_for_allow = yes ###';
 	} else {
 		// When enabled we put in the default values so there is no empty entry if there is not input from GUI
 		$varmodulesldapgroupnameattribute = ($arrmodulesldap['varmodulesldapgroupnameattribute'] ?: 'cn');
-		$varmodulesldapgroupnameattribute = "groupname_attribute = $varmodulesldapgroupnameattribute";
+		$varmodulesldapgroupnameattribute = "name_attribute = $varmodulesldapgroupnameattribute";
 		$varmodulesldapgroupmembershipfilter = ($arrmodulesldap['varmodulesldapgroupmembershipfilter'] ?: '(|(&(objectClass=GroupOfNames)(member=%{control:Ldap-UserDn}))(&(objectClass=GroupOfUniqueNames)(uniquemember=%{control:Ldap-UserDn})))');
-		$varmodulesldapgroupmembershipfilter = "groupmembership_filter = " . '"' . "$varmodulesldapgroupmembershipfilter" . '"';
+		$varmodulesldapgroupmembershipfilter = "membership_filter = " . '"' . "$varmodulesldapgroupmembershipfilter" . '"';
 		$varmodulesldapgroupmembershipattribute = ($arrmodulesldap['varmodulesldapgroupmembershipattribute'] ?: 'radiusGroupName');
-		$varmodulesldapgroupmembershipattribute = "groupmembership_attribute = $varmodulesldapgroupmembershipattribute";
+		$varmodulesldapgroupmembershipattribute = "membership_attribute = $varmodulesldapgroupmembershipattribute";
 		$varmodulesldapcomparecheckitems = ($arrmodulesldap['varmodulesldapcomparecheckitems'] ?: 'yes');
 		$varmodulesldapcomparecheckitems = "compare_check_items = $varmodulesldapcomparecheckitems";
 		$varmodulesldapdoxlat = ($arrmodulesldap['varmodulesldapdoxlat'] ?: 'yes');
@@ -2900,20 +2908,20 @@ function freeradius_modulesldap_resync($restart_svc = true) {
 	// Group membership checking
 	// When disabled we put this in the file but commented (#) like in the default installation ldap2
 	if (!$arrmodulesldap['varmodulesldap2groupenable']) {
-		$varmodulesldap2groupnameattribute = '### groupname_attribute = cn ###';
-		$varmodulesldap2groupmembershipfilter = '### groupmembership_filter = "(|(&(objectClass=GroupOfNames)(member=%{control:Ldap-UserDn}))(&(objectClass=GroupOfUniqueNames)(uniquemember=%{control:Ldap-UserDn})))" ###';
-		$varmodulesldap2groupmembershipattribute = '### groupmembership_attribute = radiusGroupName ###';
+		$varmodulesldap2groupnameattribute = '### name_attribute = cn ###';
+		$varmodulesldap2groupmembershipfilter = '### membership_filter = "(|(&(objectClass=GroupOfNames)(member=%{control:Ldap-UserDn}))(&(objectClass=GroupOfUniqueNames)(uniquemember=%{control:Ldap-UserDn})))" ###';
+		$varmodulesldap2groupmembershipattribute = '### membership_attribute = radiusGroupName ###';
 		$varmodulesldap2comparecheckitems = '### compare_check_items = yes ###';
 		$varmodulesldap2doxlat = '### do_xlat = yes ###';
 		$varmodulesldap2accessattrusedforallow = '### access_attr_used_for_allow = yes ###';
 	} else {
 		// When enabled we put in the default values so there is no empty entry if there is not input from GUI
 		$varmodulesldap2groupnameattribute = ($arrmodulesldap['varmodulesldap2groupnameattribute'] ?: 'cn');
-		$varmodulesldap2groupnameattribute = "groupname_attribute = $varmodulesldap2groupnameattribute";
+		$varmodulesldap2groupnameattribute = "name_attribute = $varmodulesldap2groupnameattribute";
 		$varmodulesldap2groupmembershipfilter = ($arrmodulesldap['varmodulesldap2groupmembershipfilter'] ?: '(|(&(objectClass=GroupOfNames)(member=%{control:Ldap-UserDn}))(&(objectClass=GroupOfUniqueNames)(uniquemember=%{control:Ldap-UserDn})))');
-		$varmodulesldap2groupmembershipfilter = "groupmembership_filter = " . '"' . "$varmodulesldap2groupmembershipfilter" . '"';
+		$varmodulesldap2groupmembershipfilter = "membership_filter = " . '"' . "$varmodulesldap2groupmembershipfilter" . '"';
 		$varmodulesldap2groupmembershipattribute = ($arrmodulesldap['varmodulesldap2groupmembershipattribute'] ?: 'radiusGroupName');
-		$varmodulesldap2groupmembershipattribute = "groupmembership_attribute = $varmodulesldap2groupmembershipattribute";
+		$varmodulesldap2groupmembershipattribute = "membership_attribute = $varmodulesldap2groupmembershipattribute";
 		$varmodulesldap2comparecheckitems = ($arrmodulesldap['varmodulesldap2comparecheckitems'] ?: 'yes');
 		$varmodulesldap2comparecheckitems = "compare_check_items = $varmodulesldap2comparecheckitems";
 		$varmodulesldap2doxlat = ($arrmodulesldap['varmodulesldap2doxlat'] ?: 'yes');
@@ -2932,358 +2940,287 @@ function freeradius_modulesldap_resync($restart_svc = true) {
 	$varmodulesldap2keepaliveprobes = ($arrmodulesldap['varmodulesldap2keepaliveprobes'] ?: '3');
 	$varmodulesldap2keepaliveinterval = ($arrmodulesldap['varmodulesldap2keepaliveinterval'] ?: '3');
 
-	$raddb = FREERADIUS_ETC . '/raddb';
+	$raddb = FREERADIUS_RADDB;
 	$conf .= <<<EOD
-# -*- text -*-
-#
-#  $Id$
-
-# Lightweight Directory Access Protocol (LDAP)
-#
-#  This module definition allows you to use LDAP for
-#  authorization and authentication.
-#
-#  See raddb/sites-available/default for reference to the
-#  ldap module in the authorize and authenticate sections.
-#
-#  However, LDAP can be used for authentication ONLY when the
-#  Access-Request packet contains a clear-text User-Password
-#  attribute.  LDAP authentication will NOT work for any other
-#  authentication method.
-#
-#  This means that LDAP servers don't understand EAP.  If you
-#  force "Auth-Type = LDAP", and then send the server a
-#  request containing EAP authentication, then authentication
-#  WILL NOT WORK.
-#
-#  The solution is to use the default configuration, which does
-#  work.
-#
-#  Setting "Auth-Type = LDAP" is ALMOST ALWAYS WRONG.  We
-#  really can't emphasize this enough.
-#
 ldap {
-	#
-	#  Note that this needs to match the name in the LDAP
-	#  server certificate, if you're using ldaps.
 	server = "$varmodulesldapserver"
 	port = "$varmodulesldapserverport"
 	identity = "$varmodulesldapidentity"
 	password = $varmodulesldappassword
-	basedn = "$varmodulesldapbasedn"
-	filter = "$varmodulesldapfilter"
-	base_filter = "$varmodulesldapbasefilter"
+	base_dn = "$varmodulesldapbasedn"
 
-	#  How many connections to keep open to the LDAP server.
-	#  This saves time over opening a new LDAP socket for
-	#  every authentication request.
-	ldap_connections_number = $varmodulesldapldapconnectionsnumber
-
-	# seconds to wait for LDAP query to finish. default: 20
-	timeout = $varmodulesldaptimeout
-
-	#  seconds LDAP server has to process the query (server-side
-	#  time limit). default: 20
-	#
-	#  LDAP_OPT_TIMELIMIT is set to this value.
-	timelimit = $varmodulesldaptimelimit
-
-	#
-	#  seconds to wait for response of the server. (network
-	#   failures) default: 10
-	#
-	#  LDAP_OPT_NETWORK_TIMEOUT is set to this value.
-	net_timeout = $varmodulesldapnettimeout
-
-	#
-	#  This subsection configures the tls related items
-	#  that control how FreeRADIUS connects to an LDAP
-	#  server.  It contains all of the "tls_*" configuration
-	#  entries used in older versions of FreeRADIUS.  Those
-	#  configuration entries can still be used, but we recommend
-	#  using these.
-	#
+	user {
+		base_dn = "\${..base_dn}"
+		filter = "$varmodulesldapfilter"
+		$varmodulesldapaccessattr
+	}
+	group {
+		base_dn = "\${..base_dn}"
+		filter = '(objectClass=posixGroup)'
+		$varmodulesldapgroupnameattribute
+		$varmodulesldapgroupmembershipfilter
+		$varmodulesldapgroupmembershipattribute
+		$varmodulesldapcomparecheckitems
+		$varmodulesldapdoxlat
+		$varmodulesldapaccessattrusedforallow
+	}
+	profile {
+		filter = "$varmodulesldapbasefilter"
+		$varmodulesldapdefaultprofile
+		$varmodulesldapprofileattribute
+	}
 	tls {
-		# Set this to 'yes' to use TLS encrypted connections
-		# to the LDAP database by using the StartTLS extended
-		# operation.
-		#
-		# The StartTLS operation is supposed to be
-		# used with normal ldap connections instead of
-		# using ldaps (port 689) connections
 		start_tls = $varmodulesldapstarttls
-
-		cacertfile = {$raddb}/certs/ca_ldap1_cert.pem
-		cacertdir = {$raddb}/certs/
-		certfile = {$raddb}/certs/radius_ldap1_cert.crt
-		keyfile = {$raddb}/certs/radius_ldap1_cert.key
-		randfile = {$raddb}/certs/random
-
-		#  Certificate Verification requirements.  Can be:
-		#    "never" (don't even bother trying)
-		#    "allow" (try, but don't fail if the certificate
-		#		can't be verified)
-		#    "demand" (fail if the certificate doesn't verify.)
-		#
-		#	The default is "allow"
+		ca_file = {$raddb}/certs/ca_ldap1_cert.pem
+		ca_path = {$raddb}/certs/
+		certificate_file = {$raddb}/certs/radius_ldap1_cert.crt
+		private_key_file = {$raddb}/certs/radius_ldap1_cert.key
+		random_file = {$raddb}/certs/random
 		require_cert = "$varmodulesldaprequirecert"
 	}
 
-	$varmodulesldapdefaultprofile
-	$varmodulesldapprofileattribute
-	$varmodulesldapaccessattr
+#	valuepair_attribute = 'radiusAttribute'
+	update {
+		control:Auth-Type		:= 'radiusAuthType'
+		control:Simultaneous-Use	:= 'radiusSimultaneousUse'
+		control:Called-Station-Id	:= 'radiusCalledStationId'
+		control:Calling-Station-Id	:= 'radiusCallingStationId'
+		control:LM-Password		:= 'lmPassword'
+		control:NT-Password		:= 'ntPassword'
+		control:LM-Password		:= 'sambaLmPassword'
+		control:NT-Password		:= 'sambaNtPassword'
+		control:LM-Password		:= 'dBCSPwd'
+		control:Password-With-Header	+= 'userPassword'
+		control:SMB-Account-CTRL-TEXT	:= 'acctFlags'
+		control:Expiration		:= 'radiusExpiration'
+		control:NAS-IP-Address		:= 'radiusNASIpAddress'
+		reply:Service-Type		:= 'radiusServiceType'
+		reply:Framed-Protocol		:= 'radiusFramedProtocol'
+		reply:Framed-IP-Address		:= 'radiusFramedIPAddress'
+		reply:Framed-IP-Netmask		:= 'radiusFramedIPNetmask'
+		reply:Framed-Route		:= 'radiusFramedRoute'
+		reply:Framed-Routing		:= 'radiusFramedRouting'
+		reply:Filter-Id			:= 'radiusFilterId'
+		reply:Framed-MTU		:= 'radiusFramedMTU'
+		reply:Framed-Compression	:= 'radiusFramedCompression'
+		reply:Login-IP-Host		:= 'radiusLoginIPHost'
+		reply:Login-Service		:= 'radiusLoginService'
+		reply:Login-TCP-Port		:= 'radiusLoginTCPPort'
+		reply:Callback-Number		:= 'radiusCallbackNumber'
+		reply:Callback-Id		:= 'radiusCallbackId'
+		reply:Framed-IPX-Network	:= 'radiusFramedIPXNetwork'
+		reply:Class			:= 'radiusClass'
+		reply:Session-Timeout		:= 'radiusSessionTimeout'
+		reply:Idle-Timeout		:= 'radiusIdleTimeout'
+		reply:Termination-Action	:= 'radiusTerminationAction'
+		reply:Login-LAT-Service		:= 'radiusLoginLATService'
+		reply:Login-LAT-Node		:= 'radiusLoginLATNode'
+		reply:Login-LAT-Group		:= 'radiusLoginLATGroup'
+		reply:Framed-AppleTalk-Link	:= 'radiusFramedAppleTalkLink'
+		reply:Framed-AppleTalk-Network	:= 'radiusFramedAppleTalkNetwork'
+		reply:Framed-AppleTalk-Zone	:= 'radiusFramedAppleTalkZone'
+		reply:Port-Limit		:= 'radiusPortLimit'
+		reply:Login-LAT-Port		:= 'radiusLoginLATPort'
+		reply:Reply-Message		:= 'radiusReplyMessage'
+		reply:Tunnel-Type		:= 'radiusTunnelType'
+		reply:Tunnel-Medium-Type	:= 'radiusTunnelMediumType'
+		reply:Tunnel-Private-Group-Id	:= 'radiusTunnelPrivateGroupId'
+		control:			+= 'radiusControlAttribute'
+		request:			+= 'radiusRequestAttribute'
+		reply:				+= 'radiusReplyAttribute'
+	}
 
-	# Mapping of RADIUS dictionary attributes to LDAP
-	# directory attributes.
-	dictionary_mapping = \${confdir}/ldap.attrmap
-	################## THE BELOW IS NOT COMPILED WITH FREERADIUS #################################
-	#  Set password_attribute = nspmPassword to get the
-	#  user's password from a Novell eDirectory
-	#  backend. This will work ONLY IF FreeRADIUS has been
-	#  built with the --with-edir configure option.
-	#
-	#  See also the following links:
-	#
-	#  http://www.novell.com/coolsolutions/appnote/16745.html
-	#  https://secure-support.novell.com/KanisaPlatform/Publishing/558/3009668_f.SAL_Public.html
-	#
-	#  Novell may require TLS encrypted sessions before returning
-	#  the user's password.
-	#
-	# password_attribute = userPassword
-
-	#  Un-comment the following to disable Novell
-	#  eDirectory account policy check and intruder
-	#  detection. This will work *only if* FreeRADIUS is
-	#  configured to build with --with-edir option.
-	#
 	edir_account_policy_check = no
-	################## THE ABOVE IS NOT COMPILED WITH FREERADIUS #################################
-	#
-	#  Group membership checking.  Disabled by default.
-	#
-	$varmodulesldapgroupnameattribute
-	$varmodulesldapgroupmembershipfilter
-	$varmodulesldapgroupmembershipattribute
 
-	$varmodulesldapcomparecheckitems
-	$varmodulesldapdoxlat
-	$varmodulesldapaccessattrusedforallow
-
-	#
-	#  The following two configuration items are for Active Directory
-	#  compatibility.  If you see the helpful "operations error"
-	#  being returned to the LDAP module, uncomment the next
-	#  two lines.
-	#
-
-	$varmodulesldapmsadcompatibility
-
-	#
-	#  By default, if the packet contains a User-Password,
-	#  and no other module is configured to handle the
-	#  authentication, the LDAP module sets itself to do
-	#  LDAP bind for authentication.
-	#
-	#  THIS WILL ONLY WORK FOR PAP AUTHENTICATION.
-	#
-	#  THIS WILL NOT WORK FOR CHAP, MS-CHAP, or 802.1x (EAP).
-	#
-	#  You can disable this behavior by setting the following
-	#  configuration entry to "no".
-	#
-	#  allowed values: {no, yes}
-	# set_auth_type = yes
-
-	#  ldap_debug: debug flag for LDAP SDK
-	#  (see OpenLDAP documentation).  Set this to enable
-	#  huge amounts of LDAP debugging on the screen.
-	#  You should only use this if you are an LDAP expert.
-	#
-	#	default: 0x0000 (no debugging messages)
-	#	Example:(LDAP_DEBUG_FILTER+LDAP_DEBUG_CONNS)
-	#ldap_debug = 0x0028
-
-	#
-	#  Keepalive configuration.  This MAY NOT be supported by your
-	#  LDAP library.  If these configuration entries appear in the
-	#  output of "radiusd -X", then they are supported.  Otherwise,
-	#  they are unsupported, and changing them will do nothing.
-	#
-	keepalive {
-		# LDAP_OPT_X_KEEPALIVE_IDLE
+	options {
 		idle = $varmodulesldapkeepaliveidle
-
-		# LDAP_OPT_X_KEEPALIVE_PROBES
 		probes = $varmodulesldapkeepaliveprobes
-
-		# LDAP_OPT_X_KEEPALIVE_INTERVAL
 		interval = $varmodulesldapkeepaliveinterval
+		$varmodulesldapmsadcompatibility
+		# ldap_debug = 0x0028
+		res_timeout = $varmodulesldaptimeout
+		srv_timelimit = $varmodulesldaptimelimit
+		net_timeout = $varmodulesldapnettimeout
+	}
+
+	pool {
+		start = 0
+		min = $varmodulesldapldapconnectionsnumber
+		max = $varmodulesldapldapconnectionsnumber
+		spare = \${thread[pool].max_spare_servers}
+		uses = 0
+		retry_delay = 30
+		lifetime = 0
+		idle_timeout = 60
+	}
+	accounting {
+		reference = "%{tolower:type.%{Acct-Status-Type}}"
+		type {
+			start {
+				update {
+					description := "Online at %S"
+				}
+			}
+			interim-update {
+				update {
+					description := "Last seen at %S"
+				}
+			}
+			stop {
+				update {
+					description := "Offline at %S"
+				}
+			}
+		}
+	}
+	post-auth {
+		update {
+			description := "Authenticated at %S"
+		}
 	}
 }
 
-ldap ldap2{
-	#
-	#  Note that this needs to match the name in the LDAP
-	#  server certificate, if you're using ldaps.
+ldap ldap2 {
 	server = "$varmodulesldap2server"
 	port = "$varmodulesldap2serverport"
 	identity = "$varmodulesldap2identity"
 	password = $varmodulesldap2password
-	basedn = "$varmodulesldap2basedn"
-	filter = "$varmodulesldap2filter"
-	base_filter = "$varmodulesldap2basefilter"
+	base_dn = "$varmodulesldap2basedn"
 
-	#  How many connections to keep open to the LDAP server.
-	#  This saves time over opening a new LDAP socket for
-	#  every authentication request.
-	ldap_connections_number = $varmodulesldap2ldapconnectionsnumber
-
-	# seconds to wait for LDAP query to finish. default: 20
-	timeout = $varmodulesldap2timeout
-
-	#  seconds LDAP server has to process the query (server-side
-	#  time limit). default: 20
-	#
-	#  LDAP_OPT_TIMELIMIT is set to this value.
-	timelimit = $varmodulesldap2timelimit
-
-	#
-	#  seconds to wait for response of the server. (network
-	#   failures) default: 10
-	#
-	#  LDAP_OPT_NETWORK_TIMEOUT is set to this value.
-	net_timeout = $varmodulesldap2nettimeout
-
-	#
-	#  This subsection configures the tls related items
-	#  that control how FreeRADIUS connects to an LDAP
-	#  server.  It contains all of the "tls_*" configuration
-	#  entries used in older versions of FreeRADIUS.  Those
-	#  configuration entries can still be used, but we recommend
-	#  using these.
-	#
+	user {
+		base_dn = "\${..base_dn}"
+		filter = "$varmodulesldap2filter"
+		$varmodulesldap2accessattr
+	}
+	group {
+		base_dn = "\${..base_dn}"
+		filter = '(objectClass=posixGroup)'
+		$varmodulesldap2groupnameattribute
+		$varmodulesldap2groupmembershipfilter
+		$varmodulesldap2groupmembershipattribute
+		$varmodulesldap2comparecheckitems
+		$varmodulesldap2doxlat
+		$varmodulesldap2accessattrusedforallow
+	}
+	profile {
+		filter = "$varmodulesldap2basefilter"
+		$varmodulesldap2defaultprofile
+		$varmodulesldap2profileattribute
+	}
 	tls {
-		# Set this to 'yes' to use TLS encrypted connections
-		# to the LDAP database by using the StartTLS extended
-		# operation.
-		#
-		# The StartTLS operation is supposed to be
-		# used with normal ldap connections instead of
-		# using ldaps (port 689) connections
 		start_tls = $varmodulesldap2starttls
-
-		cacertfile = {$raddb}/certs/ca_ldap2_cert.pem
-		cacertdir = {$raddb}/certs/
-		certfile = {$raddb}/certs/radius_ldap2_cert.crt
-		keyfile = {$raddb}/certs/radius_ldap2_cert.key
-		randfile = {$raddb}/certs/random
-
-		#  Certificate Verification requirements.  Can be:
-		#    "never" (don't even bother trying)
-		#    "allow" (try, but don't fail if the certificate
-		#		can't be verified)
-		#    "demand" (fail if the certificate doesn't verify.)
-		#
-		#	The default is "allow"
+		ca_file = {$raddb}/certs/ca_ldap2_cert.pem
+		ca_path = {$raddb}/certs/
+		certificate_file = {$raddb}/certs/radius_ldap2_cert.crt
+		private_key_file = {$raddb}/certs/radius_ldap2_cert.key
+		random_file = {$raddb}/certs/random
 		require_cert = "$varmodulesldap2requirecert"
 	}
 
-	$varmodulesldap2defaultprofile
-	$varmodulesldap2profileattribute
-	$varmodulesldap2accessattr
+#	valuepair_attribute = 'radiusAttribute'
+	update {
+		control:Auth-Type		:= 'radiusAuthType'
+		control:Simultaneous-Use	:= 'radiusSimultaneousUse'
+		control:Called-Station-Id	:= 'radiusCalledStationId'
+		control:Calling-Station-Id	:= 'radiusCallingStationId'
+		control:LM-Password		:= 'lmPassword'
+		control:NT-Password		:= 'ntPassword'
+		control:LM-Password		:= 'sambaLmPassword'
+		control:NT-Password		:= 'sambaNtPassword'
+		control:LM-Password		:= 'dBCSPwd'
+		control:Password-With-Header	+= 'userPassword'
+		control:SMB-Account-CTRL-TEXT	:= 'acctFlags'
+		control:Expiration		:= 'radiusExpiration'
+		control:NAS-IP-Address		:= 'radiusNASIpAddress'
+		reply:Service-Type		:= 'radiusServiceType'
+		reply:Framed-Protocol		:= 'radiusFramedProtocol'
+		reply:Framed-IP-Address		:= 'radiusFramedIPAddress'
+		reply:Framed-IP-Netmask		:= 'radiusFramedIPNetmask'
+		reply:Framed-Route		:= 'radiusFramedRoute'
+		reply:Framed-Routing		:= 'radiusFramedRouting'
+		reply:Filter-Id			:= 'radiusFilterId'
+		reply:Framed-MTU		:= 'radiusFramedMTU'
+		reply:Framed-Compression	:= 'radiusFramedCompression'
+		reply:Login-IP-Host		:= 'radiusLoginIPHost'
+		reply:Login-Service		:= 'radiusLoginService'
+		reply:Login-TCP-Port		:= 'radiusLoginTCPPort'
+		reply:Callback-Number		:= 'radiusCallbackNumber'
+		reply:Callback-Id		:= 'radiusCallbackId'
+		reply:Framed-IPX-Network	:= 'radiusFramedIPXNetwork'
+		reply:Class			:= 'radiusClass'
+		reply:Session-Timeout		:= 'radiusSessionTimeout'
+		reply:Idle-Timeout		:= 'radiusIdleTimeout'
+		reply:Termination-Action	:= 'radiusTerminationAction'
+		reply:Login-LAT-Service		:= 'radiusLoginLATService'
+		reply:Login-LAT-Node		:= 'radiusLoginLATNode'
+		reply:Login-LAT-Group		:= 'radiusLoginLATGroup'
+		reply:Framed-AppleTalk-Link	:= 'radiusFramedAppleTalkLink'
+		reply:Framed-AppleTalk-Network	:= 'radiusFramedAppleTalkNetwork'
+		reply:Framed-AppleTalk-Zone	:= 'radiusFramedAppleTalkZone'
+		reply:Port-Limit		:= 'radiusPortLimit'
+		reply:Login-LAT-Port		:= 'radiusLoginLATPort'
+		reply:Reply-Message		:= 'radiusReplyMessage'
+		reply:Tunnel-Type		:= 'radiusTunnelType'
+		reply:Tunnel-Medium-Type	:= 'radiusTunnelMediumType'
+		reply:Tunnel-Private-Group-Id	:= 'radiusTunnelPrivateGroupId'
+		control:			+= 'radiusControlAttribute'
+		request:			+= 'radiusRequestAttribute'
+		reply:				+= 'radiusReplyAttribute'
+	}
 
-	# Mapping of RADIUS dictionary attributes to LDAP
-	# directory attributes.
-	dictionary_mapping = \${confdir}/ldap.attrmap
-	################## THE BELOW IS NOT COMPILED WITH FREERADIUS #################################
-	#  Set password_attribute = nspmPassword to get the
-	#  user's password from a Novell eDirectory
-	#  backend. This will work ONLY IF FreeRADIUS has been
-	#  built with the --with-edir configure option.
-	#
-	#  See also the following links:
-	#
-	#  http://www.novell.com/coolsolutions/appnote/16745.html
-	#  https://secure-support.novell.com/KanisaPlatform/Publishing/558/3009668_f.SAL_Public.html
-	#
-	#  Novell may require TLS encrypted sessions before returning
-	#  the user's password.
-	#
-	# password_attribute = userPassword
-
-	#  Un-comment the following to disable Novell
-	#  eDirectory account policy check and intruder
-	#  detection. This will work *only if* FreeRADIUS is
-	#  configured to build with --with-edir option.
-	#
 	edir_account_policy_check = no
-	################## THE ABOVE IS NOT COMPILED WITH FREERADIUS #################################
-	#
-	#  Group membership checking.  Disabled by default.
-	#
-	$varmodulesldap2groupnameattribute
-	$varmodulesldap2groupmembershipfilter
-	$varmodulesldap2groupmembershipattribute
 
-	$varmodulesldap2comparecheckitems
-	$varmodulesldap2doxlat
-	$varmodulesldap2accessattrusedforallow
-
-	#
-	#  The following two configuration items are for Active Directory
-	#  compatibility.  If you see the helpful "operations error"
-	#  being returned to the LDAP module, uncomment the next
-	#  two lines.
-	#
-
-	$varmodulesldap2msadcompatibility
-
-	#
-	#  By default, if the packet contains a User-Password,
-	#  and no other module is configured to handle the
-	#  authentication, the LDAP module sets itself to do
-	#  LDAP bind for authentication.
-	#
-	#  THIS WILL ONLY WORK FOR PAP AUTHENTICATION.
-	#
-	#  THIS WILL NOT WORK FOR CHAP, MS-CHAP, or 802.1x (EAP).
-	#
-	#  You can disable this behavior by setting the following
-	#  configuration entry to "no".
-	#
-	#  allowed values: {no, yes}
-	# set_auth_type = yes
-
-	#  ldap_debug: debug flag for LDAP SDK
-	#  (see OpenLDAP documentation).  Set this to enable
-	#  huge amounts of LDAP debugging on the screen.
-	#  You should only use this if you are an LDAP expert.
-	#
-	#	default: 0x0000 (no debugging messages)
-	#	Example:(LDAP_DEBUG_FILTER+LDAP_DEBUG_CONNS)
-	#ldap_debug = 0x0028
-
-	#
-	#  Keepalive configuration.  This MAY NOT be supported by your
-	#  LDAP library.  If these configuration entries appear in the
-	#  output of "radiusd -X", then they are supported.  Otherwise,
-	#  they are unsupported, and changing them will do nothing.
-	#
-	keepalive {
-		# LDAP_OPT_X_KEEPALIVE_IDLE
+	options {
 		idle = $varmodulesldap2keepaliveidle
-
-		# LDAP_OPT_X_KEEPALIVE_PROBES
 		probes = $varmodulesldap2keepaliveprobes
-
-		# LDAP_OPT_X_KEEPALIVE_INTERVAL
 		interval = $varmodulesldap2keepaliveinterval
+		$varmodulesldap2msadcompatibility
+		# ldap_debug = 0x0028
+		res_timeout = $varmodulesldap2timeout
+		srv_timelimit = $varmodulesldap2timelimit
+		net_timeout = $varmodulesldap2nettimeout
+	}
+	pool {
+		start = 0
+		min = $varmodulesldap2ldapconnectionsnumber
+		max = $varmodulesldap2ldapconnectionsnumber
+		spare = \${thread[pool].max_spare_servers}
+		uses = 0
+		retry_delay = 30
+		lifetime = 0
+		idle_timeout = 60
+	}
+	accounting {
+		reference = "%{tolower:type.%{Acct-Status-Type}}"
+		type {
+			start {
+				update {
+					description := "Online at %S"
+				}
+			}
+			interim-update {
+				update {
+					description := "Last seen at %S"
+				}
+			}
+			stop {
+				update {
+					description := "Offline at %S"
+				}
+			}
+		}
+	}
+	post-auth {
+		update {
+			description := "Authenticated at %S"
+		}
 	}
 }
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/modules/ldap';
+	$filename = FREERADIUS_MODSENABLED . '/ldap';
+	/* Remove what could be a symlink first before writing */
+	@unlink_if_exists($filename);
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
 
@@ -3309,25 +3246,25 @@ function freeradius_plainmacauth_resync() {
 	}
 
 	// defining variables with filename path
-	$filemodulesfiles = FREERADIUS_ETC . '/raddb/mods-enabled/files';
-	$filemodulesfilesdefault = FREERADIUS_ETC . '/raddb/mods-available/files';
+	$filemodulesfiles = FREERADIUS_MODSENABLED . '/files';
+	$filemodulesfilesdefault = FREERADIUS_MODSAVAIL . 'files';
 
 	// If unchecked then plain mac auth is disabled and backups of the original files will be restored
 	if ($varsettings['varsettingsenablemacauth'] == '') {
 		// This is a check - only restore files if they aren't already
-		if (file_exists(FREERADIUS_ETC . "/raddb/plain_macauth_enabled")) {
+		if (file_exists(FREERADIUS_RADDB . "/plain_macauth_enabled")) {
 			log_error("FreeRADIUS: Plain-MAC-Auth disabled. Restoring the original file {$filemodulesfilesdefault}");
 			@unlink_if_exists($filemodulesfiles);
 			symlink( $filemodulesfilesdefault , $filemodulesfiles );
-			unlink(FREERADIUS_ETC . "/raddb/plain_macauth_enabled");
+			unlink(FREERADIUS_RADDB . "/plain_macauth_enabled");
 			freeradius_serverdefault_resync();
 		}
 	} else {
 		// If checked then plain mac auth is enabled
 		// This is a check - only modify files if they aren't already
-		if (!file_exists(FREERADIUS_ETC . "/raddb/plain_macauth_enabled")) {
+		if (!file_exists(FREERADIUS_RADDB . "/plain_macauth_enabled")) {
 			freeradius_modulesfiles_resync();
-			touch(FREERADIUS_ETC . "/raddb/plain_macauth_enabled");
+			touch(FREERADIUS_RADDB . "/plain_macauth_enabled");
 			log_error("FreeRADIUS: Plain-MAC-Auth enabled. Modified {$filemodulesfiles}");
 			freeradius_serverdefault_resync();
 		}
@@ -3389,7 +3326,7 @@ files authorized_macs {
 }
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/mods-enabled/files';
+	$filename = FREERADIUS_MODSENABLED . '/files';
 	/* Remove what could be a symlink first before writing */
 	@unlink_if_exists($filename);
 	file_put_contents($filename, $conf);
@@ -3416,8 +3353,8 @@ function freeradius_motp_resync() {
 
 	// check if disabled then we delete otpverify.sh script
 	if ($varsettings['varsettingsmotpenable'] == '') {
-		if (file_exists(FREERADIUS_ETC . "/raddb/scripts/otpverify.sh")) {
-			@unlink(FREERADIUS_ETC . "/raddb/scripts/otpverify.sh");
+		if (file_exists(FREERADIUS_SCRIPTS . "/otpverify.sh")) {
+			@unlink(FREERADIUS_SCRIPTS . "/otpverify.sh");
 		}
 	} else {
 		$conf .= <<<EOD
@@ -3539,7 +3476,7 @@ exit 11
 
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/scripts/otpverify.sh';
+	$filename = FREERADIUS_SCRIPTS . '/otpverify.sh';
 	file_put_contents($filename, $conf);
 	chmod($filename, 0750);
 	}
@@ -3550,16 +3487,18 @@ function freeradius_modulesmotp_resync() {
 	$conf = '';
 
 	// put the constant to a variable
-	$varFREERADIUS_ETC = FREERADIUS_ETC;
+	$varFREERADIUS_SCRIPTS = FREERADIUS_SCRIPTS;
 
 	$conf .= <<<EOD
 exec motp {
 		wait = yes
-		program = "{$bash_path} {$varFREERADIUS_ETC}/raddb/scripts/otpverify.sh %{request:User-Name} %{request:User-Password} %{reply:MOTP-Init-Secret} %{reply:MOTP-PIN} %{reply:MOTP-Offset}"
+		program = "{$bash_path} {$varFREERADIUS_SCRIPTS}/otpverify.sh %{request:User-Name} %{request:User-Password} %{reply:MOTP-Init-Secret} %{reply:MOTP-PIN} %{reply:MOTP-Offset}"
 	}
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/modules/motp';
+	$filename = FREERADIUS_MODSENABLED . '/motp';
+	/* Remove what could be a symlink first before writing */
+	@unlink_if_exists($filename);
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
 }
@@ -3569,28 +3508,28 @@ function freeradius_modulesdatacounter_resync() {
 	$conf = '';
 
 	// put the constant to a variable
-	$varFREERADIUS_ETC = FREERADIUS_ETC;
+	$varFREERADIUS_SCRIPTS = FREERADIUS_SCRIPTS;
 
 	$conf .= <<<EOD
 exec datacounterdaily {
 		wait = yes
-		program = "/bin/sh {$varFREERADIUS_ETC}/raddb/scripts/datacounter_acct.sh %{request:User-Name} daily %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
+		program = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_acct.sh %{request:User-Name} daily %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
 	}
 exec datacounterweekly {
 		wait = yes
-		program = "/bin/sh {$varFREERADIUS_ETC}/raddb/scripts/datacounter_acct.sh %{request:User-Name} weekly %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
+		program = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_acct.sh %{request:User-Name} weekly %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
 	}
 exec datacountermonthly {
 		wait = yes
-		program = "/bin/sh {$varFREERADIUS_ETC}/raddb/scripts/datacounter_acct.sh %{request:User-Name} monthly %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
+		program = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_acct.sh %{request:User-Name} monthly %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
 	}
 exec datacounterforever {
 		wait = yes
-		program = "/bin/sh {$varFREERADIUS_ETC}/raddb/scripts/datacounter_acct.sh %{request:User-Name} forever %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
+		program = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_acct.sh %{request:User-Name} forever %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
 	}
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/modules/datacounter_acct';
+	$filename = FREERADIUS_MODSENABLED . '/datacounter_acct';
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
 }
@@ -3627,7 +3566,7 @@ else
 fi
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/scripts/datacounter_auth.sh';
+	$filename = FREERADIUS_SCRIPTS . '/datacounter_auth.sh';
 	file_put_contents($filename, $conf);
 	chmod($filename, 0750);
 }
@@ -3686,7 +3625,7 @@ fi
 
 EOD;
 
-	$filename = FREERADIUS_ETC . '/raddb/scripts/datacounter_acct.sh';
+	$filename = FREERADIUS_SCRIPTS . '/datacounter_acct.sh';
 	file_put_contents($filename, $conf);
 	chmod($filename, 0750);
 }
@@ -3696,58 +3635,10 @@ function freeradius_dictionary_resync() {
 	$conf = '';
 
 	$conf .= <<<EOD
-
-#
-#       This is the master dictionary file, which references the
-#       pre-defined dictionary files included with the server.
-#
-#       Any new/changed attributes MUST be placed in this file, as
-#       the pre-defined dictionaries SHOULD NOT be edited.
-#
-#       \$Id\$
-#
-
-#
-#  The DHCP dictionary is used only when the server is built with
-#  "configure --with-dhcp".  It is not (and should not) be used in
-#  other situations.  If you are running just a RADIUS server, this
-#  line can be deleted.  If you are using DHCP, the following line
-#  should be uncommented.
-#
-#  Ideally, the "configure" process should automatically enable this
-#  dictionary, but we don't yet do that.
-#
-#\$INCLUDE       /usr/local/dictionary.dhcp
-
-#
-#       The filename given here should be an absolute path.
-#
-\$INCLUDE        /usr/local/share/freeradius/dictionary
-
-#
-#       Place additional attributes or \$INCLUDEs here.  They will
-#       over-ride the definitions in the pre-defined dictionaries.
-#
-#       See the 'man' page for 'dictionary' for information on
-#       the format of the dictionary files.
-
-#
-#       If you want to add entries to the dictionary file,
-#       which are NOT going to be placed in a RADIUS packet,
-#       add them here.  The numbers you pick should be between
-#       3000 and 4000.
-#
-
-#ATTRIBUTE      My-Local-String         3000    string
-#ATTRIBUTE      My-Local-IPAddr         3001    ipaddr
-#ATTRIBUTE      My-Local-Integer        3002    integer
-
-### Attributes for mobile-One-Time-Password
+# Local dictionary, does not need to include the master dictionary
 ATTRIBUTE 		MOTP-Init-Secret 		900 	string
 ATTRIBUTE 		MOTP-PIN 			901 	string
 ATTRIBUTE 		MOTP-Offset 			902 	string
-
-
 
 EOD;
 
