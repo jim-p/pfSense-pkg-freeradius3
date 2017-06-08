@@ -413,7 +413,9 @@ instantiate {
 	### Dis-/Enable sql instatiate
 {$varsqlconfinstantiate}
 }
-\$INCLUDE policy.d/
+policy {
+	\$INCLUDE policy.d/
+}
 \$INCLUDE sites-enabled/
 
 EOD;
@@ -1322,7 +1324,7 @@ EOD;
 	/* Write out TTLS inner tunnel server */
 	$conf = <<<EOD
 
-server inner-tunnel {
+server inner-tunnel-ttls {
 listen {
 	ipaddr = 127.0.0.1
 	port = 18127
@@ -1420,7 +1422,7 @@ post-proxy {
 	eap
 }
 
-} # inner-tunnel server block
+} # inner-tunnel-ttls server block
 
 EOD;
 
@@ -1433,7 +1435,7 @@ EOD;
 	/* Write out PEAP inner tunnel server */
 	$conf = <<<EOD
 
-server inner-tunnel {
+server inner-tunnel-peap {
 listen {
 	ipaddr = 127.0.0.1
 	port = 18128
@@ -1531,7 +1533,7 @@ post-proxy {
 	eap
 }
 
-} # inner-tunnel server block
+} # inner-tunnel-peap server block
 
 EOD;
 
@@ -1767,6 +1769,8 @@ function freeradius_serverdefault_resync() {
 	// If unchecked then disable authorize ldap1
 	if (!$arrmodulesldap['varmodulesldapenableauthorize']) {
 		$varmodulesldapenableauthorize = '### ldap ###';
+		/* Deactivate LDAP module if it is not enabled */
+		@unlink_if_exists(FREERADIUS_MODSENABLED . '/ldap');
 	} else {
 		$varmodulesldapenableauthorize = <<<EOD
 
@@ -2052,7 +2056,10 @@ authorize {
 	weekly
 	monthly
 	forever
-	checkval
+	# Formerly checkval
+	if (&request:Calling-Station-Id == &control:Calling-Station-Id) {
+		ok
+	}
 	expiration
 	logintime
 	pap
@@ -2077,7 +2084,7 @@ authenticate {
 	}
 	digest
 #	pam
-	unix
+#	unix
 {$varmodulesldapenableauthenticate}
 	eap
 #	Auth-Type eap {
@@ -2119,7 +2126,7 @@ accounting {
 		datacountermonthly
 		datacounterforever
 	}
-	unix
+#	unix
 	radutmp
 #	sradutmp
 #	main_pool
@@ -2439,118 +2446,49 @@ function freeradius_modulescounter_resync() {
 	$conf = '';
 
 	$conf .= <<<EOD
-# -*- text -*-
-#
-#  $Id$
 
-#  counter module:
-#  This module takes an attribute (count-attribute).
-#  It also takes a key, and creates a counter for each unique
-#  key.  The count is incremented when accounting packets are
-#  received by the server.  The value of the increment depends
-#  on the attribute type.
-#  If the attribute is Acct-Session-Time or of an integer type we add
-#  the value of the attribute. If it is anything else we increase the
-#  counter by one.
-#
-#  The 'reset' parameter defines when the counters are all reset to
-#  zero.  It can be hourly, daily, weekly, monthly or never.
-#
-#  hourly: Reset on 00:00 of every hour
-#  daily: Reset on 00:00:00 every day
-#  weekly: Reset on 00:00:00 on sunday
-#  monthly: Reset on 00:00:00 of the first day of each month
-#
-#  It can also be user defined. It should be of the form:
-#  num[hdwm] where:
-#  h: hours, d: days, w: weeks, m: months
-#  If the letter is ommited days will be assumed. In example:
-#  reset = 10h (reset every 10 hours)
-#  reset = 12  (reset every 12 days)
-#
-#
-#  The check-name attribute defines an attribute which will be
-#  registered by the counter module and can be used to set the
-#  maximum allowed value for the counter after which the user
-#  is rejected.
-#  Something like:
-#
-#  DEFAULT Max-Daily-Session := 36000
-#          Fall-Through = 1
-#
-#  You should add the counter module in the instantiate
-#  section so that it registers check-name before the files
-#  module reads the users file.
-#
-#  If check-name is set and the user is to be rejected then we
-#  send back a Reply-Message and we log a Failure-Message in
-#  the radius.log
-#
-#  If the count attribute is Acct-Session-Time then on each
-#  login we send back the remaining online time as a
-#  Session-Timeout attribute ELSE and if the reply-name is
-#  set, we send back that attribute.  The reply-name attribute
-#  MUST be of an integer type.
-#
-#  The counter-name can also be used instead of using the check-name
-#  like below:
-#
-#  DEFAULT  Daily-Session-Time > 3600, Auth-Type = Reject
-#      Reply-Message = "You've used up more than one hour today"
-#
-#  The allowed-servicetype attribute can be used to only take
-#  into account specific sessions. For example if a user first
-#  logs in through a login menu and then selects ppp there will
-#  be two sessions. One for Login-User and one for Framed-User
-#  service type. We only need to take into account the second one.
-#
-#  The module should be added in the instantiate, authorize and
-#  accounting sections.  Make sure that in the authorize
-#  section it comes after any module which sets the
-#  'check-name' attribute.
-#
 counter daily {
 	filename = /var/log/radacct/timecounter/db.daily
 	key = User-Name
-	count-attribute = Acct-Session-Time
+	count_attribute = Acct-Session-Time
 	reset = daily
-	counter-name = Daily-Session-Time
-	check-name = Max-Daily-Session
-	reply-name = Session-Timeout
-	cache-size = 5000
+	counter_name = Daily-Session-Time
+	check_name = Max-Daily-Session
+	reply_name = Session-Timeout
+	cache_size = 5000
 }
 
 counter weekly {
 	filename = /var/log/radacct/timecounter/db.weekly
 	key = User-Name
-	count-attribute = Acct-Session-Time
+	count_attribute = Acct-Session-Time
 	reset = weekly
-	counter-name = Weekly-Session-Time
-	check-name = Max-Weekly-Session
-	reply-name = Session-Timeout
-	cache-size = 5000
+	counter_name = Weekly-Session-Time
+	check_name = Max-Weekly-Session
+	reply_name = Session-Timeout
+	cache_size = 5000
 }
 
 counter monthly {
 	filename = /var/log/radacct/timecounter/db.monthly
 	key = User-Name
-	count-attribute = Acct-Session-Time
+	count_attribute = Acct-Session-Time
 	reset = monthly
-	counter-name = Monthly-Session-Time
-	check-name = Max-Monthly-Session
-	reply-name = Session-Timeout
-	cache-size = 5000
+	counter_name = Monthly-Session-Time
+	check_name = Max-Monthly-Session
+	reply_name = Session-Timeout
+	cache_size = 5000
 }
 
 counter forever {
 	filename = /var/log/radacct/timecounter/db.forever
 	key = User-Name
-	count-attribute = Acct-Session-Time
+	count_attribute = Acct-Session-Time
 	reset = never
-	counter-name = Forever-Session-Time
-	check-name = Max-Forever-Session
-	reply-name = Session-Timeout
-	cache-size = 5000
+	counter_name = Forever-Session-Time
+	check_name = Max-Forever-Session
+	reply_name = Session-Timeout
+	cache_size = 5000
 }
 
 EOD;
