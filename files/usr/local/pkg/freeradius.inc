@@ -348,7 +348,7 @@ name = radiusd
 confdir = \${raddbdir}
 modconfdir = \${confdir}/mods-config
 certdir = \${confdir}/certs
-cadir   = \${confdir}/certs
+cadir = \${confdir}/certs
 run_dir = \${localstatedir}/run
 db_dir = \${raddbdir}
 libdir = {$frlib}
@@ -1954,19 +1954,19 @@ post-auth {
 	exec
 #	wimax
 #	update reply {
-#	       Reply-Message += "%{TLS-Cert-Serial}"
-#	       Reply-Message += "%{TLS-Cert-Expiration}"
-#	       Reply-Message += "%{TLS-Cert-Subject}"
-#	       Reply-Message += "%{TLS-Cert-Issuer}"
-#	       Reply-Message += "%{TLS-Cert-Common-Name}"
-#	       Reply-Message += "%{TLS-Cert-Subject-Alt-Name-Email}"
+#		Reply-Message += "%{TLS-Cert-Serial}"
+#		Reply-Message += "%{TLS-Cert-Expiration}"
+#		Reply-Message += "%{TLS-Cert-Subject}"
+#		Reply-Message += "%{TLS-Cert-Issuer}"
+#		Reply-Message += "%{TLS-Cert-Common-Name}"
+#		Reply-Message += "%{TLS-Cert-Subject-Alt-Name-Email}"
 #
-#	       Reply-Message += "%{TLS-Client-Cert-Serial}"
-#	       Reply-Message += "%{TLS-Client-Cert-Expiration}"
-#	       Reply-Message += "%{TLS-Client-Cert-Subject}"
-#	       Reply-Message += "%{TLS-Client-Cert-Issuer}"
-#	       Reply-Message += "%{TLS-Client-Cert-Common-Name}"
-#	       Reply-Message += "%{TLS-Client-Cert-Subject-Alt-Name-Email}"
+#		Reply-Message += "%{TLS-Client-Cert-Serial}"
+#		Reply-Message += "%{TLS-Client-Cert-Expiration}"
+#		Reply-Message += "%{TLS-Client-Cert-Subject}"
+#		Reply-Message += "%{TLS-Client-Cert-Issuer}"
+#		Reply-Message += "%{TLS-Client-Cert-Common-Name}"
+#		Reply-Message += "%{TLS-Client-Cert-Subject-Alt-Name-Email}"
 #	}
 #	insert_acct_class
 #	if (&reply:EAP-Session-Id) {
@@ -3105,8 +3105,8 @@ function freeradius_motp_resync() {
 
 PATH=\$PATH:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 
-    alias checksum=$varsettingsmotpchecksumtype
-    have_md5="true"
+alias checksum=$varsettingsmotpchecksumtype
+have_md5="true"
 
 # ensure aliases are expanded by bash
 shopt -s expand_aliases
@@ -3536,7 +3536,7 @@ function freeradius_validate_users($post, &$input_errors) {
 	 */
 
 }
- 
+
 /* MACs input validation */
 function freeradius_validate_macs($post, &$input_errors) {
 
@@ -3911,7 +3911,7 @@ function freeradius_validate_eap($post, &$input_errors) {
 	}
 
 	/*
-	 * TODO: 
+	 * TODO:
 	 * EAP-TLS - Country, State or Province, City, Organization, E-Mail Address, Common Name
 	 */
 
@@ -4149,7 +4149,7 @@ function freeradius_validate_ldap($post, &$input_errors) {
 	}
 
 	/*
-	 * TODO: 
+	 * TODO:
 	 * General Configuration - Base DN, Filter, Base Filter
 	 * Miscellaneous Configuration - Default Profile, Profile Attribute, Access Attribute
 	 * Group Membership Options - Groupname Attribute, Group Membership Filter, Group Membership Attribute
