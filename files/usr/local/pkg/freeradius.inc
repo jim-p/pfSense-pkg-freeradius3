@@ -237,6 +237,7 @@ SERVICENAME="radiusd"
 	else
 		echo "\$SERVICENAME.sh: Cannot continue at this moment, this script is already trying to start service PID: \$(cat \$LOCKFILE)"
 	fi
+
 EOD;
 	$rcfile['stop'] = FREERADIUS_ETC . '/rc.d/radiusd onestop';
 	write_rcfile($rcfile);
@@ -318,7 +319,14 @@ function freeradius_settings_resync($restart_svc = true) {
 
 	// Dis-/Enable SQL module in freeradius_settings_resync() and radiusd.conf SQL SERVER 1
 	if ($sqlconf['varsqlconfincludeenable'] == 'on') {
-		$varsqlconfinstantiate = "{$varsqlconf2failover} {" . "\n\t\tsql" . "\n\t\t{$varsqlconf2instantiate}" . "\n\t}";
+		$varsqlconfinstantiate = <<<EOD
+
+	$varsqlconf2failover {
+		sql
+		{$varsqlconf2instantiate}
+	}
+
+EOD;
 	} else {
 		/* Remove the sql files from the active modules directory when they are not needed. */
 		@unlink_if_exists(FREERADIUS_MODSENABLED . '/sql');
@@ -336,100 +344,25 @@ sbindir = \${exec_prefix}/sbin
 logdir = \${localstatedir}/log
 raddbdir = \${sysconfdir}/raddb
 radacctdir = \${logdir}/radacct
-confdir = \${raddbdir}
-run_dir = \${localstatedir}/run
-libdir = {$frlib}
-pidfile = \${run_dir}/radiusd.pid
-db_dir = \${raddbdir}
 name = radiusd
-#chroot = /path/to/chroot/directory
-#user = freeradius
-#group = freeradius
-
-###############################################################################
-### Is not present in freeradius 2.x radiusd.conf anymore but it was in 1.x ###
-### delete_blocked_requests = no                                            ###
-### usercollide = no                                                        ###
-### lower_user = no                                                         ###
-### lower_pass = no                                                         ###
-### nospace_user = no                                                       ###
-### nospace_pass = no                                                       ###
-###############################################################################
-
+confdir = \${raddbdir}
+modconfdir = \${confdir}/mods-config
+certdir = \${confdir}/certs
+cadir   = \${confdir}/certs
+run_dir = \${localstatedir}/run
+db_dir = \${raddbdir}
+libdir = {$frlib}
+pidfile = \${run_dir}/\${name}.pid
 max_request_time = $varsettingsmaxrequesttime
 cleanup_delay = $varsettingscleanupdelay
 max_requests = $varsettingsmaxrequests
 hostname_lookups = $varsettingshostnamelookups
-allow_core_dumps = $varsettingsallowcoredumps
 regular_expressions = $varsettingsregularexpressions
 extended_expressions = $varsettingsextendedexpressions
 
-EOD;
-
-	// Deletes virtual-server coa by default. Will be re-enabled if there is an interface-type "coa"
-	unlink_if_exists(FREERADIUS_SITESENABLED . "/coa");
-
-	if (is_array($config['installedpackages']['freeradiusinterfaces']['config'])) {
-		$arrinterfaces = $config['installedpackages']['freeradiusinterfaces']['config'];
-	} else {
-		$arrinterfaces = array();
-	}
-
-	if (!empty($arrinterfaces)) {
-		foreach ($arrinterfaces as $item) {
-			$varinterfaceip = $item['varinterfaceip'];
-			$varinterfaceport = $item['varinterfaceport'];
-			$varinterfacetype = $item['varinterfacetype'];
-			$varinterfaceipversion = $item['varinterfaceipversion'];
-
-			// if interface-type = detail
-			if ($item['varinterfacetype'] == 'detail') {
-				$conf .= <<<EOD
-listen {
-	type = $varinterfacetype
-	$varinterfaceipversion = $varinterfaceip
-	port = $varinterfaceport
-	filename = \${radacctdir}/detail-%Y%m%d:%H
-	load_factor = 10
-}
-
-EOD;
-			} // endif - interface-type = detail
-
-			// if interface-type = coa
-			if ($item['varinterfacetype'] == 'coa') {
-			// Enables virtual-server coa because interface-type is coa
-				symlink(FREERADIUS_SITESAVAIL . "/coa", FREERADIUS_SITESENABLED);
-				$conf .= <<<EOD
-listen {
-	type = $varinterfacetype
-	$varinterfaceipversion = $varinterfaceip
-	port = $varinterfaceport
-	server = coa
-}
-
-EOD;
-			} // endif interface-type = coa
-
-			// if interface-type = auth, acct, proxy, status
-			if (($item['varinterfacetype'] == 'auth') || ($item['varinterfacetype'] == 'acct') || ($item['varinterfacetype'] == 'proxy') || ($item['varinterfacetype'] == 'status')) {
-				$conf .= <<<EOD
-listen {
-	type = $varinterfacetype
-	$varinterfaceipversion = $varinterfaceip
-	port = $varinterfaceport
-}
-
-EOD;
-			} // endif interface-type = auth, acct, proxy, status
-		} // endforeach
-	} // endif empty
-
-
-	$conf .= <<<EOD
-
 log {
 	destination = $varsettingslogdir
+	colourise = yes
 	file = \${logdir}/radius.log
 	syslog_facility = daemon
 	stripped_names = $varsettingsstrippednames
@@ -438,13 +371,17 @@ log {
 	auth_goodpass = $varsettingsauthgoodpass
 	msg_goodpass = "$varsettingsauthgoodpassmessage"
 	msg_badpass = "$varsettingsauthbadpassmessage"
+	msg_denied = "You are already logged in - access denied"
 }
 
 checkrad = \${sbindir}/checkrad
 security {
+	allow_core_dumps = $varsettingsallowcoredumps
 	max_attributes = $varsettingsmaxattributes
 	reject_delay = $varsettingsrejectdelay
 	status_server = no
+	# Disable this check since it may not be accurate due to how FreeBSD patches OpenSSL
+	allow_vulnerable_openssl = yes
 }
 
 \$INCLUDE  clients.conf
@@ -455,16 +392,16 @@ thread pool {
 	max_spare_servers = $varsettingsmaxspareservers
 	max_queue_size = $varsettingsmaxqueuesize
 	max_requests_per_server = $varsettingsmaxrequestsperserver
+	auto_limit_acct = no
 }
 
-modconfdir = \${confdir}/mods-config/
-moddir = \${confdir}/mods-available/
+#modconfdir = \${confdir}/mods-config/
+#moddir = \${confdir}/mods-available/
 modules {
 	\$INCLUDE \${confdir}/mods-enabled/
 }
 
 instantiate {
-
 	exec
 	expr
 	daily
@@ -478,6 +415,7 @@ instantiate {
 }
 \$INCLUDE policy.d/
 \$INCLUDE sites-enabled/
+
 EOD;
 
 	file_put_contents(FREERADIUS_RADDB . '/radiusd.conf', $conf);
@@ -634,7 +572,13 @@ function freeradius_users_resync($via_rpc = false) {
 
 			// this is the part for mobile otp
 			if ($users['varusersmotpenable'] == 'on') {
-				$varusersreplyitem .= "MOTP-Init-Secret = $varusersmotpinitsecret," . "\n\tMOTP-PIN = $varusersmotppin," . "\n\tMOTP-Offset = $varusersmotpoffset";
+				$varusersreplyitem .= <<<EOD
+
+	MOTP-Init-Secret = $varusersmotpinitsecret,
+	MOTP-PIN = $varusersmotppin,
+	MOTP-Offset = $varusersmotpoffset
+
+EOD;
 			} else {
 				$varusersreplyitem .= '';
 			}
@@ -644,55 +588,93 @@ function freeradius_users_resync($via_rpc = false) {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\tFramed-IP-Address = $varusersframedipaddress";
+				$varusersreplyitem .= <<<EOD
+
+	Framed-IP-Address = $varusersframedipaddress
+
+EOD;
 			}
 			if ($varusersframedipnetmask != '') {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\tFramed-IP-Netmask = $varusersframedipnetmask";
+				$varusersreplyitem .= <<<EOD
+
+	Framed-IP-Netmask = $varusersframedipnetmask
+
+EOD;
 			}
 			if ($varusersframedroute != '') {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\tFramed-Route = " . '"' . $varusersframedroute . '"';
+				$varusersreplyitem .= <<<EOD
+
+	Framed-Route = "{$varusersframedroute}"
+
+EOD;
 			}
 			if ($varuserssessiontimeout != '') {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\tSession-Timeout := $varuserssessiontimeout";
+				$varusersreplyitem .= <<<EOD
+
+	Session-Timeout := $varuserssessiontimeout
+
+EOD;
 			}
 			if ($varusersvlanid != '') {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\tTunnel-Type = VLAN,\n\tTunnel-Medium-Type = IEEE-802,\n\tTunnel-Private-Group-ID = " . '"' . $varusersvlanid . '"';
+				$varusersreplyitem .= <<<EOD
+
+	Tunnel-Type = VLAN,
+	Tunnel-Medium-Type = IEEE-802,
+	Tunnel-Private-Group-ID = "{$varusersvlanid}";
+
+EOD;
 			}
 			if ($varusersmaxbandwidthup != '') {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\tWISPr-Bandwidth-Max-Up := $varusersmaxbandwidthup";
+				$varusersreplyitem .= <<<EOD
+
+	WISPr-Bandwidth-Max-Up := $varusersmaxbandwidthup
+
+EOD;
 			}
 			if ($varusersmaxbandwidthdown != '') {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\tWISPr-Bandwidth-Max-Down := $varusersmaxbandwidthdown";
+				$varusersreplyitem .= <<<EOD
+
+	WISPr-Bandwidth-Max-Down := $varusersmaxbandwidthdown
+
+EOD;
 			}
 			if ($varusersacctinteriminterval != '') {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\tAcct-Interim-Interval := $varusersacctinteriminterval";
+				$varusersreplyitem .= <<<EOD
+
+	Acct-Interim-Interval := $varusersacctinteriminterval
+
+EOD;
 			}
 			if ($varuserswisprredirectionurl != '') {
 				if ($varusersreplyitem != '') {
 					$varusersreplyitem .= ",";
 				}
-				$varusersreplyitem .= "\n\tWISPr-Redirection-URL := $varuserswisprredirectionurl";
+				$varusersreplyitem .= <<<EOD
+
+	WISPr-Redirection-URL := $varuserswisprredirectionurl
+
+EOD;
 			}
 			// If an octet limit is set we create the files for the limit and the counter. Further we call an exec script which checks if the limit is reached or not
 			if ($varusersmaxtotaloctets != '') {
@@ -700,7 +682,12 @@ function freeradius_users_resync($via_rpc = false) {
 					$varusersreplyitem .= ",";
 				}
 				// create exec script
-				$varusersreplyitem .= "\n\tExec-Program-Wait = " . '"/bin/sh ' . FREERADIUS_SCRIPTS . '/datacounter_auth.sh ' . "$varusersusername $varusersmaxtotaloctetstimerange" . '"';
+				$varFREERADIUS_SCRIPTS = FREERADIUS_SCRIPTS;
+				$varusersreplyitem .= <<<EOD
+
+	Exec-Program-Wait = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_auth.sh {$varusersusername} {$varusersmaxtotaloctetstimerange}";
+
+EOD;
 				// create limit file - will be always overwritten so we can increase limit from GUI
 				file_put_contents("/var/log/radacct/datacounter/$varusersmaxtotaloctetstimerange/max-octets-$varusersusername", $varusersmaxtotaloctets, LOCK_EX);
 				// if used-octets file exist we do NOT overwrite this file!!!
@@ -726,6 +713,7 @@ function freeradius_users_resync($via_rpc = false) {
 $varusersadditionaloptionstop
 $varuserscheckitem
 	$varusersreplyitem
+
 EOD;
 		} // endforeach
 	} // endif
@@ -862,55 +850,93 @@ function freeradius_authorizedmacs_resync($restart_svc = true, $via_rpc = false)
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\tFramed-IP-Address = $varmacsframedipaddress";
+				$varmacsreplyitem .= <<<EOD
+
+	Framed-IP-Address = $varmacsframedipaddress
+
+EOD;
 			}
 			if ($varmacsframedipnetmask != '') {
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\tFramed-IP-Netmask = $varmacsframedipnetmask";
+				$varmacsreplyitem .= <<<EOD
+
+	Framed-IP-Netmask = $varmacsframedipnetmask
+
+EOD;
 			}
 			if ($varmacsframedroute != '') {
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\tFramed-Route = " . '"' . $varmacsframedroute . '"';
+				$varmacsreplyitem .= <<<EOD
+
+	Framed-Route = "{$varmacsframedroute}"
+
+EOD;
 			}
 			if ($varmacssessiontimeout != '') {
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\tSession-Timeout := $varmacssessiontimeout";
+				$varmacsreplyitem .= <<<EOD
+
+	Session-Timeout := $varmacssessiontimeout
+
+EOD;
 			}
 			if ($varmacsvlanid != '') {
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\tTunnel-Type = VLAN,\n\tTunnel-Medium-Type = IEEE-802,\n\tTunnel-Private-Group-ID = " . '"' . $varmacsvlanid . '"';
+				$varmacsreplyitem .= <<<EOD
+
+	Tunnel-Type = VLAN,
+	Tunnel-Medium-Type = IEEE-802,
+	Tunnel-Private-Group-ID = "{$varmacsvlanid}"
+
+EOD;
 			}
 			if ($varmacsmaxbandwidthup != '') {
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\tWISPr-Bandwidth-Max-Up := $varmacsmaxbandwidthup";
+				$varmacsreplyitem .= <<<EOD
+
+	WISPr-Bandwidth-Max-Up := $varmacsmaxbandwidthup
+
+EOD;
 			}
 			if ($varmacsmaxbandwidthdown != '') {
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\tWISPr-Bandwidth-Max-Down := $varmacsmaxbandwidthdown";
+				$varmacsreplyitem .= <<<EOD
+
+	WISPr-Bandwidth-Max-Down := $varmacsmaxbandwidthdown
+
+EOD;
 			}
 			if ($varmacsacctinteriminterval != '') {
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\tAcct-Interim-Interval := $varmacsacctinteriminterval";
+				$varmacsreplyitem .= <<<EOD
+
+	Acct-Interim-Interval := $varmacsacctinteriminterval
+
+EOD;
 			}
 			if ($varmacswisprredirectionurl != '') {
 				if ($varmacsreplyitem != '') {
 					$varmacsreplyitem .= ",";
 				}
-				$varmacsreplyitem .= "\n\tWISPr-Redirection-URL := $varmacsswisprredirectionurl";
+				$varmacsreplyitem .= <<<EOD
+
+	WISPr-Redirection-URL := $varmacsswisprredirectionurl
+
+EOD;
 			}
 			// If an octet limit is set we create the files for the limit and the counter. Further we call an exec script which checks if the limit is reached or not
 			if ($varmacsmaxtotaloctets != '') {
@@ -918,7 +944,12 @@ function freeradius_authorizedmacs_resync($restart_svc = true, $via_rpc = false)
 					$varmacsreplyitem .= ",";
 				}
 				//create exec script
-				$varmacsreplyitem .= "\n\tExec-Program-Wait = " . '"/bin/sh ' . FREERADIUS_SCRIPTS . '/datacounter_auth.sh ' . "$varmacsaddress $varmacsmaxtotaloctetstimerange" . '"';
+				$varFREERADIUS_SCRIPTS = FREERADIUS_SCRIPTS;
+				$varmacsreplyitem .= <<<EOD
+
+	Exec-Program-Wait = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_auth.sh {$varmacsaddress} {$varmacsmaxtotaloctetstimerange}"
+
+EOD;
 				// create limit file - will be always overwritten so we can increase limit from GUI
 				file_put_contents("/var/log/radacct/datacounter/$varmacsmaxtotaloctetstimerange/max-octets-$varmacsaddress", $varmacsmaxtotaloctets, LOCK_EX);
 				// if used-octets file exist we do NOT overwrite this file!!!
@@ -944,6 +975,7 @@ function freeradius_authorizedmacs_resync($restart_svc = true, $via_rpc = false)
 $varmacsadditionaloptionstop
 $varmacscheckitem
 	$varmacsreplyitem
+
 EOD;
 		} // endforeach
 	} // endif
@@ -1041,7 +1073,18 @@ function freeradius_eapconf_resync($restart_svc = true) {
 
 	// Disable weak EAP types like MD5, GTC, LEAP
 	if ($eapconf['vareapconfdisableweakeaptypes'] == '') {
-		$vareapconfweakeaptypes = "md5 {" . "\n\t\t}" . "\n\t\tleap {" . "\n\t\t}" . "\n\t\tgtc {" . "\n\t\t\t#challenge = " . '"Password: "' . "\n\t\t\tauth_type = PAP" . "\n\t\t}";
+		$vareapconfweakeaptypes = <<<EOD
+	md5 {
+	}
+	leap {
+	}
+	gtc {
+		#challenge = "Password: "
+		auth_type = PAP
+	}
+
+EOD;
+
 	} else {
 		$vareapconfweakeaptypes = '### DISABLED WEAK EAP TYPES MD5, GTC, LEAP ###';
 	}
@@ -1076,18 +1119,24 @@ function freeradius_eapconf_resync($restart_svc = true) {
 	// Variables: EAP-TTLS
 	$vareapconfttlsdefaulteaptype = ($eapconf['vareapconfttlsdefaulteaptype'] ?: 'md5');
 	$vareapconfttlscopyrequesttotunnel = ($eapconf['vareapconfttlscopyrequesttotunnel'] ?: 'no');
-	$vareapconfttlsusetunneledreply = ($eapconf['vareapconfttlsusetunneledreply'] ?: 'no');
+	$vareapconfttlsusetunneledreply = ($eapconf['vareapconfttlsusetunneledreply'] ? 1 : 0);
 	$vareapconfttlsincludelength = ($eapconf['vareapconfttlsincludelength'] ?: 'yes');
 
 	// Variables: EAP-PEAP with MSCHAPv2
 	$vareapconfpeapdefaulteaptype = ($eapconf['vareapconfpeapdefaulteaptype'] ?: 'mschapv2');
 	$vareapconfpeapcopyrequesttotunnel = ($eapconf['vareapconfpeapcopyrequesttotunnel'] ?: 'no');
-	$vareapconfpeapusetunneledreply = ($eapconf['vareapconfpeapusetunneledreply'] ?: 'no');
+	$vareapconfpeapusetunneledreply = ($eapconf['vareapconfpeapusetunneledreply'] ? 1 : 0);
 	$vareapconfpeapsohenable = ($eapconf['vareapconfpeapsohenable'] ?: 'Disable');
 
 	// This is for enable/disbable MS SoH in EAP-PEAP and the virtuial-server "soh-server"
 	if ($eapconf['vareapconfpeapsohenable'] == 'Enable') {
-		$vareapconfpeapsoh = 'soh = yes' . "\n\t\t\tsoh_virtual_server = " . '"' . "soh-server" . '"';
+		$vareapconfpeapsoh = <<<EOD
+
+		soh = yes
+		soh_virtual_server = "soh-server"
+
+EOD;
+
 		symlink(FREERADIUS_SITESAVAIL . "/soh", FREERADIUS_SITESENABLED);
 	} else {
 		$vareapconfpeapsoh = '### MS SoH Server is disabled ###';
@@ -1143,10 +1192,6 @@ function freeradius_eapconf_resync($restart_svc = true) {
 		log_error("freeRADIUS: Creating new DH file in " . FREERADIUS_CERTS);
 		file_put_contents(FREERADIUS_ETC . "/dh", openvpn_create_dhparams('1024'), LOCK_EX);
 	}
-	if (!file_exists(FREERADIUS_CERTS . "/random")) {
-		log_error("freeRADIUS: Creating new random file in " . FREERADIUS_CERTS);
-		mwexec("/bin/dd if=/dev/urandom of=" . FREERADIUS_CERTS . "/random count=10");
-	}
 
 	// check if the common name of the certificate must match the username
 	if ($eapconf['vareapconfenablecheckcertcn'] == 'on') {
@@ -1163,71 +1208,131 @@ function freeradius_eapconf_resync($restart_svc = true) {
 	}
 
 	$conf .= <<<EOD
-	### EAP
-	eap {
-		default_eap_type = $vareapconfdefaulteaptype
-		timer_expire     = $vareapconftimerexpire
-		ignore_unknown_eap_types = $vareapconfignoreunknowneaptypes
-		cisco_accounting_username_bug = $vareapconfciscoaccountingusernamebug
-		max_sessions = $vareapconfmaxsessions
+### EAP
+eap {
+	default_eap_type = $vareapconfdefaulteaptype
+	timer_expire     = $vareapconftimerexpire
+	ignore_unknown_eap_types = $vareapconfignoreunknowneaptypes
+	cisco_accounting_username_bug = $vareapconfciscoaccountingusernamebug
+	max_sessions = $vareapconfmaxsessions
 
-		$vareapconfweakeaptypes
+	$vareapconfweakeaptypes
 
+#	pwd {
+#		group = 19
+#		server_id = theserver@example.com
+#		fragment_size = 1020
+#		virtual_server = "inner-tunnel"
+#	}
 
-		### EAP-TLS and EAP-TLS with OCSP support
-		tls {
-			certdir = \${confdir}/certs
-			cadir = \${confdir}/certs
-			# private_key_password =
-			private_key_file = \${certdir}/$vareapconfprivatekeyfile
-			certificate_file = \${certdir}/$vareapconfcertificatefile
-			CA_file = \${cadir}/$vareapconfcafile
-			dh_file = \${certdir}/dh
-			random_file = \${certdir}/random
-			fragment_size = $vareapconffragmentsize
-			include_length = $vareapconfincludelength
-			{$check_crl}
-			CA_path = \${cadir}
-			$vareapconfcheckcertissuer
-			$vareapconfcheckcertcn
-			cipher_list = "DEFAULT"
-			ecdh_curve = "prime256v1"
-			cache {
-			      enable = $vareapconfcacheenablecache
-			      lifetime = $vareapconfcachelifetime
-			      max_entries = $vareapconfcachemaxentries
-			}
-			verify {
-		#     		tmpdir = /tmp/radiusd
-		#    		client = "/path/to/openssl verify -CApath ${CA_path} %{TLS-Client-Cert-Filename}"
-			}
-			ocsp {
-			      enable = $vareapconfocspenable
-			      override_cert_url = $vareapconfocspoverridecerturl
-			      url = "$vareapconfocspurl"
-			}
+	tls-config tls-common {
+		# private_key_password = whatever
+		private_key_file = \${certdir}/$vareapconfprivatekeyfile
+		certificate_file = \${certdir}/$vareapconfcertificatefile
+		ca_path = \${confdir}/certs
+		ca_file = \${ca_path}/$vareapconfcafile
+	#	auto_chain = yes
+	#	psk_identity = "test"
+	#	psk_hexphrase = "036363823"
+		dh_file = \${certdir}/dh
+		random_file = /dev/urandom
+		fragment_size = $vareapconffragmentsize
+		include_length = $vareapconfincludelength
+		{$check_crl}
+		$vareapconfcheckcertissuer
+		$vareapconfcheckcertcn
+		cipher_list = "DEFAULT"
+		cipher_server_preference = no
+#		disable_tlsv1_2 = no
+		ecdh_curve = "prime256v1"
+		cache {
+			enable = $vareapconfcacheenablecache
+			lifetime = $vareapconfcachelifetime
+			max_entries = $vareapconfcachemaxentries
+			#name = "EAP module"
+			#persist_dir = "${logdir}/tlscache"
 		}
-
-		### EAP-TTLS
-		ttls {
-			default_eap_type = $vareapconfttlsdefaulteaptype
-			copy_request_to_tunnel = $vareapconfttlscopyrequesttotunnel
-			use_tunneled_reply = $vareapconfttlsusetunneledreply
-			include_length = $vareapconfttlsincludelength
-		}	### end ttls
-
-		### EAP-PEAP
-		peap {
-			default_eap_type = $vareapconfpeapdefaulteaptype
-			copy_request_to_tunnel = $vareapconfpeapcopyrequesttotunnel
-			use_tunneled_reply = $vareapconfpeapusetunneledreply
-		#	proxy_tunneled_request_as_eap = yes
-			$vareapconfpeapsoh
+		verify {
+	#		skip_if_ocsp_ok = no
+	#		tmpdir = /tmp/radiusd
+	#		client = "/path/to/openssl verify -CApath ${..ca_path} %{TLS-Client-Cert-Filename}"
 		}
-		mschapv2 {
-		#	send_error = no
+		ocsp {
+			enable = $vareapconfocspenable
+			override_cert_url = $vareapconfocspoverridecerturl
+			url = "$vareapconfocspurl"
+			# use_nonce = yes
+			# timeout = 0
+			# softfail = no
 		}
 	}
+	tls {
+		tls = tls-common
+	#	virtual_server = check-eap-tls
+	}
+	ttls {
+		tls = tls-common
+		default_eap_type = $vareapconfttlsdefaulteaptype
+		copy_request_to_tunnel = $vareapconfttlscopyrequesttotunnel
+		include_length = $vareapconfttlsincludelength
+	#	require_client_cert = yes
+		virtual_server = "inner-tunnel"
+		#use_tunneled_reply is deprecated
+		if ($vareapconfttlsusetunneledreply) {
+			update reply {
+				User-Name !* ANY
+				Message-Authenticator !* ANY
+				EAP-Message !* ANY
+				Proxy-State !* ANY
+				MS-MPPE-Encryption-Types !* ANY
+				MS-MPPE-Encryption-Policy !* ANY
+				MS-MPPE-Send-Key !* ANY
+				MS-MPPE-Recv-Key !* ANY
+			}
+			update {
+				&outer.session-state: += &reply:
+			}
+		}
+	}	### end ttls
+	peap {
+		tls = tls-common
+		default_eap_type = $vareapconfpeapdefaulteaptype
+		copy_request_to_tunnel = $vareapconfpeapcopyrequesttotunnel
+	#	proxy_tunneled_request_as_eap = yes
+	#	require_client_cert = yes
+		$vareapconfpeapsoh
+
+		virtual_server = "inner-tunnel"
+		#use_tunneled_reply is deprecated
+		if ($vareapconfpeapusetunneledreply) {
+			update reply {
+				User-Name !* ANY
+				Message-Authenticator !* ANY
+				EAP-Message !* ANY
+				Proxy-State !* ANY
+				MS-MPPE-Encryption-Types !* ANY
+				MS-MPPE-Encryption-Policy !* ANY
+				MS-MPPE-Send-Key !* ANY
+				MS-MPPE-Recv-Key !* ANY
+			}
+			update {
+				&outer.session-state: += &reply:
+			}
+		}
+	}
+	mschapv2 {
+#		send_error = no
+#		identity = "FreeRADIUS"
+	}
+#	fast {
+#		tls = tls-common
+#		pac_lifetime = 604800
+#		authority_identity = "1234"
+#		pac_opaque_key = "0123456789abcdef0123456789ABCDEF"
+#		virtual_server = inner-tunnel
+#	}
+}
+
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/eap';
@@ -1367,20 +1472,16 @@ sql {
 	read_groups = $varsqlconfreadgroups
 	delete_stale_sessions = $varsqlconfdeletestalesessions
 	logfile = $varsqlconfsqltrace
-	num_sql_socks = $varsqlconfnumsqlsocks
-	connect_failure_retry_delay = $varsqlconfconnectfailureretrydelay
-	lifetime = $varsqlconflifetime
-	max_queries = $varsqlconfmaxqueries
 	read_clients = $varsqlconfreadclients
 	nas_table = "$varsqlconfnastable"
 	pool {
 		start = \${thread[pool].start_servers}
 		min = \${thread[pool].min_spare_servers}
-		max = \${thread[pool].max_servers}
+		max = $varsqlconfnumsqlsocks
 		spare = \${thread[pool].max_spare_servers}
-		uses = 0
-		retry_delay = 30
-		lifetime = 0
+		uses = $varsqlconfmaxqueries
+		retry_delay = $varsqlconfconnectfailureretrydelay
+		lifetime = $varsqlconflifetime
 		idle_timeout = 60
 	}
 	group_attribute = "SQL-Group"
@@ -1407,25 +1508,22 @@ sql sql2 {
 	read_groups = $varsqlconf2readgroups
 	delete_stale_sessions = $varsqlconf2deletestalesessions
 	logfile = $varsqlconf2sqltrace
-	num_sql_socks = $varsqlconf2numsqlsocks
-	connect_failure_retry_delay = $varsqlconf2connectfailureretrydelay
-	lifetime = $varsqlconf2lifetime
-	max_queries = $varsqlconf2maxqueries
 	read_clients = $varsqlconf2readclients
 	nas_table = "$varsqlconf2nastable"
 	pool {
 		start = \${thread[pool].start_servers}
 		min = \${thread[pool].min_spare_servers}
-		max = \${thread[pool].max_servers}
+		max = $varsqlconf2numsqlsocks
 		spare = \${thread[pool].max_spare_servers}
-		uses = 0
-		retry_delay = 30
-		lifetime = 0
+		uses = $varsqlconf2maxqueries
+		retry_delay = $varsqlconf2connectfailureretrydelay
+		lifetime = $varsqlconf2lifetime
 		idle_timeout = 60
 	}
 	group_attribute = "\${.:instance}-SQL-Group"
 	\$INCLUDE \${modconfdir}/\${.:name}/main/\${dialect}/queries.conf
 }
+
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/sql';
@@ -1467,12 +1565,15 @@ function freeradius_serverdefault_resync() {
 	if (!$arrmodulesldap['varmodulesldapenableauthorize']) {
 		$varmodulesldapenableauthorize = '### ldap ###';
 	} else {
-		$varmodulesldapenableauthorize = '';
-		$varmodulesldapenableauthorize .= "$varmodulesldap2failover {";
-		$varmodulesldapenableauthorize .= "\n\t\tldap";
-		// this line adds ldap2 when activated
-		$varmodulesldapenableauthorize .= "\n\t\t$varmodulesldap2enableauthorize";
-		$varmodulesldapenableauthorize .= "\n\t}";
+		$varmodulesldapenableauthorize = <<<EOD
+
+$varmodulesldap2failover {
+	ldap
+	# this line adds ldap2 when activated
+	$varmodulesldap2enableauthorize
+}
+
+EOD;
 	}
 
 	// If unchecked then disable authenticate for ldap1
@@ -1484,9 +1585,23 @@ function freeradius_serverdefault_resync() {
 
 	// If unchecked then disable authenticate ldap2
 	if (!$arrmodulesldap['varmodulesldapenableauthenticate']) {
-		$varmodulesldapenableauthenticate = "#Auth-Type LDAP {" . "\n\t\t\t#ldap" . "\n\t\t\t$varmodulesldap2enableauthenticate" . "\n\t#}";
+		$varmodulesldapenableauthenticate = <<<EOD;
+
+	#Auth-Type LDAP {
+		#ldap
+		#$varmodulesldap2enableauthenticate
+	#}
+
+EOD;
 	} else {
-		$varmodulesldapenableauthenticate = "Auth-Type LDAP {" . "\n\t\t\tldap" . "\n\t\t\t$varmodulesldap2enableauthenticate" . "\n\t}";
+		$varmodulesldapenableauthenticate = <<<EOD;
+
+	Auth-Type LDAP {
+		ldap
+		$varmodulesldap2enableauthenticate
+	}
+
+EOD;
 	}
 
 	// Get Variables from freeradiussqlconf.xml for DATABASE 1
@@ -1536,28 +1651,56 @@ function freeradius_serverdefault_resync() {
 
 	// authorize section DATABASE 1
 	if (($sqlconf['varsqlconfincludeenable'] == 'on') && ($sqlconf['varsqlconfenableauthorize'] == 'Enable')) {
-		$varsqlconfauthorize = "$varsqlconf2failover {" . "\n\t\t\tsql" . "\n\t\t\t$varsqlconf2authorize" . "\n\t}";
+		$varsqlconfauthorize = <<<EOD
+
+	$varsqlconf2failover {
+		sql
+		$varsqlconf2authorize
+	}
+
+EOD;
 	} else {
 		$varsqlconfauthorize = '### sql DISABLED ###';
 	}
 
 	// accounting section DATABASE 1
 	if (($sqlconf['varsqlconfincludeenable'] == 'on') && ($sqlconf['varsqlconfenableaccounting'] == 'Enable')) {
-		$varsqlconfaccounting = "$varsqlconf2failover {" . "\n\t\t\tsql" . "\n\t\t\t$varsqlconf2accounting" . "\n\t}";
+		$varsqlconfaccounting = <<<EOD
+
+	$varsqlconf2failover {
+		sql
+		$varsqlconf2accounting
+	}
+
+EOD;
 	} else {
 		$varsqlconfaccounting = '### sql DISABLED ###';
 	}
 
 	// session section DATABASE 1
 	if (($sqlconf['varsqlconfincludeenable'] == 'on') && ($sqlconf['varsqlconfenablesession'] == 'Enable')) {
-		$varsqlconfsession = "$varsqlconf2failover {" . "\n\t\t\tsql" . "\n\t\t\t$varsqlconf2session" . "\n\t}";
+		$varsqlconfsession = <<<EOD
+
+	$varsqlconf2failover {
+		sql
+		$varsqlconf2session
+	}
+
+EOD;
 	} else {
 		$varsqlconfsession = 'radutmp';
 	}
 
 	// post-auth section DATABASE 1
 	if (($sqlconf['varsqlconfincludeenable'] == 'on') && ($sqlconf['varsqlconfenablepostauth'] == 'Enable')) {
-		$varsqlconfpostauth = "$varsqlconf2failover {" . "\n\t\t\tsql" . "\n\t\t\t$varsqlconf2postauth" . "\n\t}";
+		$varsqlconfpostauth = <<<EOD
+
+	$varsqlconf2failover {
+		sql
+		$varsqlconf2postauth
+	}
+
+EOD;
 		$varsqlconfpostauthtypereject = 'sql';
 	} else {
 		$varsqlconfpostauth = '### sql DISABLED ###';
@@ -1579,23 +1722,29 @@ function freeradius_serverdefault_resync() {
 		$varplainmacpreacctenable = '##### ACCOUNTING FOR PLAIN MAC-AUTH DISABLED #####';
 	} else {
 		// If checked we need to check if it is plain mac or eap
-		$varplainmacauthenable = '';
-		$varplainmacauthenable .= "### FIRST check MAC address in authorized_macs and if that fails proceed with other checks below in else-section ###";
-		$varplainmacauthenable .= "\n\t### if cleaning up the Calling-Station-Id...###";
-		$varplainmacauthenable .= "\n\trewrite_calling_station_id";
-		$varplainmacauthenable .= "\n\t";
-		$varplainmacauthenable .= "\n\t# now check against the authorized_macs file";
-		$varplainmacauthenable .= "\n\tauthorized_macs";
-		$varplainmacauthenable .= "\n\tif (ok) {";
-		$varplainmacauthenable .= "\n\t\t\tupdate control {";
-		$varplainmacauthenable .= "\n\t\t\tAuth-Type := Accept";
-		$varplainmacauthenable .= "\n\t\t}";
-		$varplainmacauthenable .= "\n\t}";
-		$varplainmacauthenable .= "\n\t### Here we have to place all other authorize modules which should be check when MAC fails ###";
+		$varplainmacauthenable = <<<EOD
 
-		$varplainmacpreacctenable = '';
-		$varplainmacpreacctenable .= '##### ACCOUNTING FOR PLAIN MAC-AUTH ENABLED #####';
-		$varplainmacpreacctenable .= "\n\trewrite_calling_station_id";
+	### FIRST check MAC address in authorized_macs and if that fails proceed with other checks below in else-section ###";
+	### if cleaning up the Calling-Station-Id...###";
+	rewrite_calling_station_id
+
+	# now check against the authorized_macs file
+	authorized_macs
+	if (ok) {
+		update control {
+			Auth-Type := Accept
+		}
+	}
+	### Here we have to place all other authorize modules which should be check when MAC fails ###";
+
+EOD;
+
+		$varplainmacpreacctenable = <<<EOD
+
+	##### ACCOUNTING FOR PLAIN MAC-AUTH ENABLED #####
+	rewrite_calling_station_id
+
+EOD;
 	}
 
 	// Disable acct_unique in preacct section
@@ -1606,338 +1755,128 @@ function freeradius_serverdefault_resync() {
 	}
 
 	$conf .= <<<EOD
-######################################################################
-#
-#	As of 2.0.0, FreeRADIUS supports virtual hosts using the
-#	"server" section, and configuration directives.
-#
-#	Virtual hosts should be put into the "sites-available"
-#	directory.  Soft links should be created in the "sites-enabled"
-#	directory to these files.  This is done in a normal installation.
-#
-#	If you are using 802.1X (EAP) authentication, please see also
-#	the "inner-tunnel" virtual server.  You wll likely have to edit
-#	that, too, for authentication to work.
-#
-#	$Id$
-#
-######################################################################
-#
-#	Read "man radiusd" before editing this file.  See the section
-#	titled DEBUGGING.  It outlines a method where you can quickly
-#	obtain the configuration you want, without running into
-#	trouble.  See also "man unlang", which documents the format
-#	of this file.
-#
-#	This configuration is designed to work in the widest possible
-#	set of circumstances, with the widest possible number of
-#	authentication methods.  This means that in general, you should
-#	need to make very few changes to this file.
-#
-#	The best way to configure the server for your local system
-#	is to CAREFULLY edit this file.  Most attempts to make large
-#	edits to this file will BREAK THE SERVER.  Any edits should
-#	be small, and tested by running the server with "radiusd -X".
-#	Once the edits have been verified to work, save a copy of these
-#	configuration files somewhere.  (e.g. as a "tar" file).  Then,
-#	make more edits, and test, as above.
-#
-#	There are many "commented out" references to modules such
-#	as ldap, sql, etc.  These references serve as place-holders.
-#	If you need the functionality of that module, then configure
-#	it in radiusd.conf, and un-comment the references to it in
-#	this file.  In most cases, those small changes will result
-#	in the server being able to connect to the DB, and to
-#	authenticate users.
-#
-######################################################################
+server default {
 
-#
-#	In 1.x, the "authorize", etc. sections were global in
-#	radiusd.conf.  As of 2.0, they SHOULD be in a server section.
-#
-#	The server section with no virtual server name is the "default"
-#	section.  It is used when no server name is specified.
-#
-#	We don't indent the rest of this file, because doing so
-#	would make it harder to read.
-#
+EOD;
 
-#  Authorization. First preprocess (hints and huntgroups files),
-#  then realms, and finally look in the "users" file.
-#
-#  Any changes made here should also be made to the "inner-tunnel"
-#  virtual server.
-#
-#  The order of the realm modules will determine the order that
-#  we try to find a matching realm.
-#
-#  Make *sure* that 'preprocess' comes before any realm if you
-#  need to setup hints for the remote radius server
-authorize {
-	#
-	#  Security settings.  Take a User-Name, and do some simple
-	#  checks on it, for spaces and other invalid characters.  If
-	#  it looks like the user is trying to play games, reject it.
-	#
-	#  This should probably be enabled by default.
-	#
-	#  See policy.d/filter for the definition of the filter_username policy.
-	#
-#	filter_username
+	// Deletes virtual-server coa by default. Will be re-enabled if there is an interface-type "coa"
+	unlink_if_exists(FREERADIUS_SITESENABLED . "/coa");
 
-	#
-	#  The preprocess module takes care of sanitizing some bizarre
-	#  attributes in the request, and turning them into attributes
-	#  which are more standard.
-	#
-	#  It takes care of processing the 'raddb/hints' and the
-	#  'raddb/huntgroups' files.
-	preprocess
-
-	#
-	#
-	$varplainmacauthenable
-
-	#
-	#  If you want to have a log of authentication requests,
-	#  un-comment the following line, and the 'detail auth_log'
-	#  section, above.
-#	auth_log
-
-	#
-	#  The chap module will set 'Auth-Type := CHAP' if we are
-	#  handling a CHAP request and Auth-Type has not already been set
-	chap
-
-	#
-	#  If the users are logging in with an MS-CHAP-Challenge
-	#  attribute for authentication, the mschap module will find
-	#  the MS-CHAP-Challenge attribute, and add 'Auth-Type := MS-CHAP'
-	#  to the request, which will cause the server to then use
-	#  the mschap module for authentication.
-	mschap
-
-	#
-	#  If you have a Cisco SIP server authenticating against
-	#  FreeRADIUS, uncomment the following line, and the 'digest'
-	#  line in the 'authenticate' section.
-	digest
-
-	#
-	#  The WiMAX specification says that the Calling-Station-Id
-	#  is 6 octets of the MAC.  This definition conflicts with
-	#  RFC 3580, and all common RADIUS practices.  Un-commenting
-	#  the "wimax" module here means that it will fix the
-	#  Calling-Station-Id attribute to the normal format as
-	#  specified in RFC 3580 Section 3.21
-#	wimax
-
-	#
-	#  Look for IPASS style 'realm/', and if not found, look for
-	#  '@realm', and decide whether or not to proxy, based on
-	#  that.
-#	IPASS
-
-	#
-	#  If you are using multiple kinds of realms, you probably
-	#  want to set "ignore_null = yes" for all of them.
-	#  Otherwise, when the first style of realm doesn't match,
-	#  the other styles won't be checked.
-	#
-
-	suffix
-	ntdomain
-
-	#
-	#  This module takes care of EAP-MD5, EAP-TLS, and EAP-LEAP
-	#  authentication.
-	#
-	#  It also sets the EAP-Type attribute in the request
-	#  attribute list to the EAP type from the packet.
-	#
-	#  As of 2.0, the EAP module returns "ok" in the authorize stage
-	#  for TTLS and PEAP.  In 1.x, it never returned "ok" here, so
-	#  this change is compatible with older configurations.
-	#
-	#  The example below uses module failover to avoid querying all
-	#  of the following modules if the EAP module returns "ok".
-	#  Therefore, your LDAP and/or SQL servers will not be queried
-	#  for the many packets that go back and forth to set up TTLS
-	#  or PEAP.  The load on those servers will therefore be reduced.
-	#
-	#
-
-	eap {
-		ok = return
+	if (is_array($config['installedpackages']['freeradiusinterfaces']['config'])) {
+		$arrinterfaces = $config['installedpackages']['freeradiusinterfaces']['config'];
+	} else {
+		$arrinterfaces = array();
 	}
 
-	#
-	#  Pull crypt'd passwords from /etc/passwd or /etc/shadow,
-	#  using the system API's to get the password.  If you want
-	#  to read /etc/passwd or /etc/shadow directly, see the
-	#  passwd module in radiusd.conf.
-	#
+	if (!empty($arrinterfaces)) {
+		foreach ($arrinterfaces as $item) {
+			$varinterfaceip = $item['varinterfaceip'];
+			$varinterfaceport = $item['varinterfaceport'];
+			$varinterfacetype = $item['varinterfacetype'];
+			$varinterfaceipversion = $item['varinterfaceipversion'];
+
+			// if interface-type = detail
+			if ($item['varinterfacetype'] == 'detail') {
+				$conf .= <<<EOD
+listen {
+	type = $varinterfacetype
+	$varinterfaceipversion = $varinterfaceip
+	port = $varinterfaceport
+	filename = \${radacctdir}/detail-%Y%m%d:%H
+	load_factor = 10
+}
+
+EOD;
+			} // endif - interface-type = detail
+
+			// if interface-type = coa
+			if ($item['varinterfacetype'] == 'coa') {
+			// Enables virtual-server coa because interface-type is coa
+				symlink(FREERADIUS_SITESAVAIL . "/coa", FREERADIUS_SITESENABLED);
+				$conf .= <<<EOD
+listen {
+	type = $varinterfacetype
+	$varinterfaceipversion = $varinterfaceip
+	port = $varinterfaceport
+	server = coa
+}
+
+EOD;
+			} // endif interface-type = coa
+
+			// if interface-type = auth, acct, proxy, status
+			if (($item['varinterfacetype'] == 'auth') || ($item['varinterfacetype'] == 'acct') || ($item['varinterfacetype'] == 'proxy') || ($item['varinterfacetype'] == 'status')) {
+				$conf .= <<<EOD
+listen {
+	type = $varinterfacetype
+	$varinterfaceipversion = $varinterfaceip
+	port = $varinterfaceport
+}
+
+EOD;
+			} // endif interface-type = auth, acct, proxy, status
+		} // endforeach
+	} // endif empty
+
+
+	$conf .= <<<EOD
+
+authorize {
+#	filter_username
+#	filter_password
+	preprocess
+#	operator-name
+#	cui
+	$varplainmacauthenable
+#	auth_log
+	chap
+	mschap
+	digest
+#	wimax
+#	IPASS
+	suffix
+	ntdomain
+	eap {
+		ok = return
+#		updated = return
+	}
 #	unix
-
-	#
-	#  Read the 'users' file
 	files
-
-	#
-	#  Look in an SQL database.  The schema of the database
-	#  is meant to mirror the "users" file.
-	#
-	#  See "Authorization Queries" in mods-config/sql/main/<DB>/queries.conf
 	$varsqlconfauthorize
-
-	#
-	#  If you are using /etc/smbpasswd, and are also doing
-	#  mschap authentication, the un-comment this line, and
-	#  configure the 'etc_smbpasswd' module, above.
-#	etc_smbpasswd
-
-	#
-	#  The ldap module will set Auth-Type to LDAP if it has not
-	#  already been set
-
+#	smbpasswd
 	$varmodulesldapenableauthorize
-
-	#
-	#  Enforce daily limits on time spent logged in.
 	daily
 	weekly
 	monthly
 	forever
-
-	#
-	# Use the checkval module
 	checkval
-
 	expiration
 	logintime
-
-	#
-	#  If no other module has claimed responsibility for
-	#  authentication, then try to use PAP.  This allows the
-	#  other modules listed above to add a "known good" password
-	#  to the request, and to do nothing else.  The PAP module
-	#  will then see that password, and use it to do PAP
-	#  authentication.
-	#
-	#  This module should be listed last, so that the other modules
-	#  get a chance to set Auth-Type for themselves.
-	#
 	pap
-
-	#
-	#  If "status_server = yes", then Status-Server messages are passed
-	#  through the following section, and ONLY the following section.
-	#  This permits you to do DB queries, for example.  If the modules
-	#  listed here return "fail", then NO response is sent.
-	#
 	Autz-Type Status-Server {
 
 	}
 }
 
-
-#  Authentication.
-#
-#
-#  This section lists which modules are available for authentication.
-#  Note that it does NOT mean 'try each module in order'.  It means
-#  that a module from the 'authorize' section adds a configuration
-#  attribute 'Auth-Type := FOO'.  That authentication type is then
-#  used to pick the apropriate module from the list below.
-#
-
-#  In general, you SHOULD NOT set the Auth-Type attribute.  The server
-#  will figure it out on its own, and will do the right thing.  The
-#  most common side effect of erroneously setting the Auth-Type
-#  attribute is that one authentication method will work, but the
-#  others will not.
-#
-#  The common reasons to set the Auth-Type attribute by hand
-#  is to either forcibly reject the user (Auth-Type := Reject),
-#  or to or forcibly accept the user (Auth-Type := Accept).
-#
-#  Note that Auth-Type := Accept will NOT work with EAP.
-#
-#  Please do not put "unlang" configurations into the "authenticate"
-#  section.  Put them in the "post-auth" section instead.  That's what
-#  the post-auth section is for.
-#
 authenticate {
-	#
-	#  PAP authentication, when a back-end database listed
-	#  in the 'authorize' section supplies a password.  The
-	#  password can be clear-text, or encrypted.
 	Auth-Type PAP {
 		pap
 	}
-
-	#
-	#  Most people want CHAP authentication
-	#  A back-end database listed in the 'authorize' section
-	#  MUST supply a CLEAR TEXT password.  Encrypted passwords
-	#  won't work.
 	Auth-Type CHAP {
 		chap
 	}
-
-	#
-	#  MSCHAP authentication.
 	Auth-Type MS-CHAP {
 		mschap
 	}
-
-	#
-	#  Mobile-One-Time-Password (MOTP) authentication.
+	mschap
 	Auth-Type MOTP {
 		motp
 	}
-
-	#
-	#  If you have a Cisco SIP server authenticating against
-	#  FreeRADIUS, uncomment the following line, and the 'digest'
-	#  line in the 'authorize' section.
 	digest
-
-	#
-	#  Pluggable Authentication Modules.
 #	pam
-
-	#
-	#  See 'man getpwent' for information on how the 'unix'
-	#  module checks the users password.  Note that packets
-	#  containing CHAP-Password attributes CANNOT be authenticated
-	#  against /etc/passwd!  See the FAQ for details.
-	#
-	#  For normal "crypt" authentication, the "pap" module should
-	#  be used instead of the "unix" module.  The "unix" module should
-	#  be used for authentication ONLY for compatibility with legacy
-	#  FreeRADIUS configurations.
-	#
 	unix
-
-	# Uncomment it if you want to use ldap for authentication
-	#
-	# Note that this means "check plain-text password against
-	# the ldap database", which means that EAP won't work,
-	# as it does not supply a plain-text password.
 	$varmodulesldapenableauthenticate
-
-	#
-	#  Allow EAP authentication.
 	eap
-
-	#
-	#  The older configurations sent a number of attributes in
-	#  Access-Challenge packets, which wasn't strictly correct.
-	#  If you want to filter out these attributes, uncomment
-	#  the following lines.
-	#
 #	Auth-Type eap {
 #		eap {
 #			handled = 1
@@ -1949,67 +1888,27 @@ authenticate {
 #	}
 }
 
-
-#
-#  Pre-accounting.  Decide which accounting type to use.
-#
 preacct {
 	preprocess
-
 	$varplainmacpreacctenable
-
-	#
-	#  Session start times are *implied* in RADIUS.
-	#  The NAS never sends a "start time".  Instead, it sends
-	#  a start packet, *possibly* with an Acct-Delay-Time.
-	#  The server is supposed to conclude that the start time
-	#  was "Acct-Delay-Time" seconds in the past.
-	#
-	#  The code below creates an explicit start time, which can
-	#  then be used in other modules.
-	#
-	#  The start time is: NOW - delay - session_length
-	#
-
+#	acct_counters64
 	update request {
-		FreeRADIUS-Acct-Session-Start-Time = "%{expr: %l - %{%{Acct-Session-Time}:-0} - %{%{Acct-Delay-Time}:-0}}"
+		&FreeRADIUS-Acct-Session-Start-Time = "%{expr: %l - %{%{Acct-Session-Time}:-0} - %{%{Acct-Delay-Time}:-0}}"
 	}
-
-	#
-	#  Ensure that we have a semi-unique identifier for every
-	#  request, and many NAS boxes are broken.
 	$varsettingsacctuniqueenabled
-
-	#
-	#  Look for IPASS-style 'realm/', and if not found, look for
-	#  '@realm', and decide whether or not to proxy, based on
-	#  that.
-	#
-	#  Accounting requests are generally proxied to the same
-	#  home server as authentication requests.
 #	IPASS
 	suffix
 	ntdomain
-
-	#
-	#  Read the 'acct_users' file
 	files
 }
 
-#
-#  Accounting.  Log the accounting data.
-#
 accounting {
-	#
-	#  Create a 'detail'ed log of the packets.
-	#  Note that accounting requests which are proxied
-	#  are also logged in the detail file.
+#	cui
 	detail
 	daily
 	weekly
 	monthly
 	forever
-
 	### This makes it possible to run the datacounter_acct module only on accounting-stop and interim-updates
 	if ((request:Acct-Status-Type == Stop) || (request:Acct-Status-Type == Interim-Update)) {
 		datacounterdaily
@@ -2017,267 +1916,101 @@ accounting {
 		datacountermonthly
 		datacounterforever
 	}
-
-	#  Update the wtmp file
-	#
-	#  If you don't use "radlast", you can delete this line.
 	unix
-
-	#
-	#  For Simultaneous-Use tracking.
-	#
-	#  Due to packet losses in the network, the data here
-	#  may be incorrect.  There is little we can do about it.
 	radutmp
 #	sradutmp
-
-	#  Return an address to the IP Pool when we see a stop record.
 #	main_pool
-
-	#
-	#  Log traffic to an SQL database.
-	#
-	#  See "Accounting queries" in mods-config/sql/main/<DB>/queries.conf
 	$varsqlconfaccounting
-
-	#
-	#  If you receive stop packets with zero session length,
-	#  they will NOT be logged in the database.  The SQL module
-	#  will print a message (only in debugging mode), and will
-	#  return "noop".
-	#
-	#  You can ignore these packets by uncommenting the following
-	#  three lines.  Otherwise, the server will not respond to the
-	#  accounting request, and the NAS will retransmit.
-	#
 #	if (noop) {
 #		ok
 #	}
-
-	#
-	#  Instead of sending the query to the SQL server,
-	#  write it into a log file.
-	#
-#	sql_log
-
-	#  Cisco VoIP specific bulk accounting
 #	pgsql-voip
-
-	# For Exec-Program and Exec-Program-Wait
 	exec
-
-	#  Filter attributes from the accounting response.
 	attr_filter.accounting_response
-
-	#
-	#  See "Autz-Type Status-Server" for how this works.
-	#
 	Acct-Type Status-Server {
 
 	}
 }
 
-
-#  Session database, used for checking Simultaneous-Use. Either the radutmp
-#  or rlm_sql module can handle this.
-#  The rlm_sql module is *much* faster
 session {
-	### choose radutmp or sql
+#	radutmp
 	$varsqlconfsession
 }
 
-
-#  Post-Authentication
-#  Once we KNOW that the user has been authenticated, there are
-#  additional steps we can take.
 post-auth {
-	#  Get an address from the IP Pool.
+#	if (!&reply:State) {
+#		update reply {
+#			State := "0x%{randstr:16h}"
+#		}
+#	}
+	update {
+		&reply: += &session-state:
+	}
 #	main_pool
-
-	#
-	#  If you want to have a log of authentication replies,
-	#  un-comment the following line, and the 'detail reply_log'
-	#  section, above.
+#	cui
 #	reply_log
-
-	#
-	#  After authenticating the user, do another SQL query.
-	#
-	#  See "Authentication Logging Queries" in mods-config/sql/main/<DB>/queries.conf
 	$varsqlconfpostauth
-
-	#
-	#  Instead of sending the query to the SQL server,
-	#  write it into a log file.
-	#
-#	sql_log
-
-	#
-	#  Un-comment the following if you have set
-	#  'edir_account_policy_check = yes' in the ldap module sub-section of
-	#  the 'modules' section.
-	#
 #	ldap
-
-	# For Exec-Program and Exec-Program-Wait
 	exec
-
-	#
-	#  Calculate the various WiMAX keys.  In order for this to work,
-	#  you will need to define the WiMAX NAI, usually via
-	#
-	#	update request {
-	#	       WiMAX-MN-NAI = "%{User-Name}"
-	#	}
-	#
-	#  If you want various keys to be calculated, you will need to
-	#  update the reply with "template" values.  The module will see
-	#  this, and replace the template values with the correct ones
-	#  taken from the cryptographic calculations.  e.g.
-	#
-	# 	update reply {
-	#		WiMAX-FA-RK-Key = 0x00
-	#		WiMAX-MSK = "%{EAP-MSK}"
-	#	}
-	#
-	#  You may want to delete the MS-MPPE-*-Keys from the reply,
-	#  as some WiMAX clients behave badly when those attributes
-	#  are included.  See "raddb/modules/wimax", configuration
-	#  entry "delete_mppe_keys" for more information.
-	#
 #	wimax
-
-	#  If there is a client certificate (EAP-TLS, sometimes PEAP
-	#  and TTLS), then some attributes are filled out after the
-	#  certificate verification has been performed.  These fields
-	#  MAY be available during the authentication, or they may be
-	#  available only in the "post-auth" section.
-	#
-	#  The first set of attributes contains information about the
-	#  issuing certificate which is being used.  The second
-	#  contains information about the client certificate (if
-	#  available).
-#
 #	update reply {
 #	       Reply-Message += "%{TLS-Cert-Serial}"
 #	       Reply-Message += "%{TLS-Cert-Expiration}"
 #	       Reply-Message += "%{TLS-Cert-Subject}"
 #	       Reply-Message += "%{TLS-Cert-Issuer}"
 #	       Reply-Message += "%{TLS-Cert-Common-Name}"
+#	       Reply-Message += "%{TLS-Cert-Subject-Alt-Name-Email}"
 #
 #	       Reply-Message += "%{TLS-Client-Cert-Serial}"
 #	       Reply-Message += "%{TLS-Client-Cert-Expiration}"
 #	       Reply-Message += "%{TLS-Client-Cert-Subject}"
 #	       Reply-Message += "%{TLS-Client-Cert-Issuer}"
 #	       Reply-Message += "%{TLS-Client-Cert-Common-Name}"
+#	       Reply-Message += "%{TLS-Client-Cert-Subject-Alt-Name-Email}"
 #	}
-
-
-	#  If the WiMAX module did it's work, you may want to do more
-	#  things here, like delete the MS-MPPE-*-Key attributes.
-	#
-	#	if (updated) {
-	#		update reply {
-	#			MS-MPPE-Recv-Key !* 0x00
-	#			MS-MPPE-Send-Key !* 0x00
-	#		}
-	#	}
-
-	#
-	#  Access-Reject packets are sent through the REJECT sub-section of the
-	#  post-auth section.
-	#
-	#  Add the ldap module name (or instance) if you have set
-	#  'edir_account_policy_check = yes' in the ldap module configuration
-	#
+#	insert_acct_class
+#	if (&reply:EAP-Session-Id) {
+#		update reply {
+#			EAP-Key-Name := &reply:EAP-Session-Id
+#		}
+#	}
+	remove_reply_message_if_eap
 	Post-Auth-Type REJECT {
-
 		# log failed authentications in SQL, too.
 		$varsqlconfpostauthtypereject
 		attr_filter.access_reject
+		eap
+		remove_reply_message_if_eap
+	}
+	Post-Auth-Type Challenge {
+
 	}
 }
-#
-#  When the server decides to proxy a request to a home server,
-#  the proxied request is first passed through the pre-proxy
-#  stage.  This stage can re-write the request, or decide to
-#  cancel the proxy.
-#
-#  Only a few modules currently have this method.
-#
+
 pre-proxy {
-#	attr_rewrite
-
-	#  Uncomment the following line if you want to change attributes
-	#  as defined in the preproxy_users file.
+#	operator-name
+#	cui
 #	files
-
-	#  Uncomment the following line if you want to filter requests
-	#  sent to remote servers based on the rules defined in the
-	#  'attrs.pre-proxy' file.
 	attr_filter.pre-proxy
-
-	#  If you want to have a log of packets proxied to a home
-	#  server, un-comment the following line, and the
-	#  'detail pre_proxy_log' section, above.
 #	pre_proxy_log
 }
 
-#
-#  When the server receives a reply to a request it proxied
-#  to a home server, the request may be massaged here, in the
-#  post-proxy stage.
-#
 post-proxy {
 
-	#  If you want to have a log of replies from a home server,
-	#  un-comment the following line, and the 'detail post_proxy_log'
-	#  section, above.
 #	post_proxy_log
-
-#	attr_rewrite
-
-	#  Uncomment the following line if you want to filter replies from
-	#  remote proxies based on the rules defined in the 'attrs' file.
 	attr_filter.post-proxy
-
-	#
-	#  If you are proxying LEAP, you MUST configure the EAP
-	#  module, and you MUST list it here, in the post-proxy
-	#  stage.
-	#
-	#  You MUST also use the 'nostrip' option in the 'realm'
-	#  configuration.  Otherwise, the User-Name attribute
-	#  in the proxied request will not match the user name
-	#  hidden inside of the EAP packet, and the end server will
-	#  reject the EAP request.
-	#
 	eap
-
-	#
-	#  If the server tries to proxy a request and fails, then the
-	#  request is processed through the modules in this section.
-	#
-	#  The main use of this section is to permit robust proxying
-	#  of accounting packets.  The server can be configured to
-	#  proxy accounting packets as part of normal processing.
-	#  Then, if the home server goes down, accounting packets can
-	#  be logged to a local "detail" file, for processing with
-	#  radrelay.  When the home server comes back up, radrelay
-	#  will read the detail file, and send the packets to the
-	#  home server.
-	#
-	#  With this configuration, the server always responds to
-	#  Accounting-Requests from the NAS, but only writes
-	#  accounting packets to disk if the home server is down.
-	#
-#	Post-Proxy-Type Fail {
+#	Post-Proxy-Type Fail-Accounting {
 #			detail
 #	}
 }
+}
+
 EOD;
 
-	$filename = FREERADIUS_SITESAVAIL . '/default';
+	$filename = FREERADIUS_SITESENABLED . '/default';
+	/* Remove what could be a symlink first before writing */
+	@unlink_if_exists($filename);
 	file_put_contents($filename, $conf);
 	chmod($filename, 0640);
 
@@ -2616,6 +2349,7 @@ counter forever {
 	reply-name = Session-Timeout
 	cache-size = 5000
 }
+
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/counter';
@@ -2664,6 +2398,7 @@ mschap {
 #	allow_retry = yes
 #	retry_msg = "Re-enter (or reset) the password"
 }
+
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/mschap';
@@ -2680,8 +2415,6 @@ function freeradius_modulesrealm_resync() {
 
 	$conf .= <<<EOD
 #  'realm/username'
-#
-#  Using this entry, IPASS users have their realm set to "IPASS".
 realm IPASS {
 		format = prefix
 		delimiter = "/"
@@ -2689,7 +2422,6 @@ realm IPASS {
 		ignore_default = no
 }
 #  'username@realm'
-#
 realm suffix {
 		format = suffix
 		delimiter = "@"
@@ -2697,7 +2429,6 @@ realm suffix {
 		ignore_default = no
 }
 #  'username%realm'
-#
 realm realmpercent {
 		format = suffix
 		delimiter = "%"
@@ -2706,13 +2437,13 @@ realm realmpercent {
 }
 #
 #  'domain\user'
-#
 realm ntdomain {
 		format = prefix
 		delimiter = '\\\\'
 		ignore_null = yes
 		ignore_default = no
 }
+
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/realm';
@@ -2839,7 +2570,12 @@ function freeradius_modulesldap_resync($restart_svc = true) {
 	if ($arrmodulesldap['varmodulesldapmsadcompatibilityenable'] == 'Disable') {
 		$varmodulesldapmsadcompatibility = '### MS Active Directory Compatibility is disabled ###';
 	} else {
-		$varmodulesldapmsadcompatibility = 'chase_referrals = yes' . "\n\trebind = yes";
+		$varmodulesldapmsadcompatibility = <<<EOD
+
+		chase_referrals = yes
+		rebind = yes
+
+EOD;
 	}
 
 	// Miscellaneous Configuration + MS Active Directory Compatibility ldap2
@@ -2847,7 +2583,12 @@ function freeradius_modulesldap_resync($restart_svc = true) {
 	if ($arrmodulesldap['varmodulesldap2msadcompatibilityenable'] == 'Disable') {
 		$varmodulesldap2msadcompatibility = '### MS Active Directory Compatibility is disabled ###';
 	} else {
-		$varmodulesldap2msadcompatibility = 'chase_referrals = yes' . "\n\trebind = yes";
+		$varmodulesldap2msadcompatibility = <<<EOD
+
+		chase_referrals = yes
+		rebind = yes
+
+EOD;
 	}
 
 	// When disabled we put this in the file but commented (#) like in the default installation ldap1
@@ -2975,7 +2716,7 @@ ldap {
 		ca_path = {$raddb}/certs/
 		certificate_file = {$raddb}/certs/radius_ldap1_cert.crt
 		private_key_file = {$raddb}/certs/radius_ldap1_cert.key
-		random_file = {$raddb}/certs/random
+		random_file = /dev/urandom
 		require_cert = "$varmodulesldaprequirecert"
 	}
 
@@ -3036,7 +2777,7 @@ ldap {
 		idle = $varmodulesldapkeepaliveidle
 		probes = $varmodulesldapkeepaliveprobes
 		interval = $varmodulesldapkeepaliveinterval
-		$varmodulesldapmsadcompatibility
+$varmodulesldapmsadcompatibility
 		# ldap_debug = 0x0028
 		res_timeout = $varmodulesldaptimeout
 		srv_timelimit = $varmodulesldaptimelimit
@@ -3113,7 +2854,7 @@ ldap ldap2 {
 		ca_path = {$raddb}/certs/
 		certificate_file = {$raddb}/certs/radius_ldap2_cert.crt
 		private_key_file = {$raddb}/certs/radius_ldap2_cert.key
-		random_file = {$raddb}/certs/random
+		random_file = /dev/urandom
 		require_cert = "$varmodulesldap2requirecert"
 	}
 
@@ -3174,7 +2915,7 @@ ldap ldap2 {
 		idle = $varmodulesldap2keepaliveidle
 		probes = $varmodulesldap2keepaliveprobes
 		interval = $varmodulesldap2keepaliveinterval
-		$varmodulesldap2msadcompatibility
+$varmodulesldap2msadcompatibility
 		# ldap_debug = 0x0028
 		res_timeout = $varmodulesldap2timeout
 		srv_timelimit = $varmodulesldap2timelimit
@@ -3216,6 +2957,7 @@ ldap ldap2 {
 		}
 	}
 }
+
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/ldap';
@@ -3276,54 +3018,20 @@ function freeradius_modulesfiles_resync() {
 	$conf = '';
 
 	$conf .= <<<EOD
-# -*- text -*-
-#
-#  \$Id\$
-
-# Livingston-style 'users' file
-#
 files {
-	# The default key attribute to use for matches.  The content
-	# of this attribute is used to match the "name" of the
-	# entry.
-	#key = "%{Stripped-User-Name:-%{User-Name}}"
-
+	#key = "%{%{Stripped-User-Name}:-%{User-Name}}"
 	usersfile = \${confdir}/users
 	acctusersfile = \${confdir}/acct_users
 	preproxy_usersfile = \${confdir}/preproxy_users
-
-	#  If you want to use the old Cistron 'users' file
-	#  with FreeRADIUS, you should change the next line
-	#  to 'compat = cistron'.  You can the copy your 'users'
-	#  file from Cistron.
 	compat = no
 }
 
-#  An example which defines a second instance of the "files" module.
-#  This instance is named "second_files".  In order for it to be used
-#  in a virtual server, it needs to be listed as "second_files"
-#  inside of the "authorize" section (or other section).  If you just
-#  list "files", that will refer to the configuration defined above.
-#
-
-#  The two names here mean:
-#	"files" - this is a configuration for the "rlm_files" module
-#	"second_files" - this is a named configuration, which isn't
-#			the default configuration.
 files authorized_macs {
-        # The default key attribute to use for matches.  The content
-        # of this attribute is used to match the "name" of the
-        # entry.
-        key = "%{Calling-Station-ID}"
-
-        usersfile = \${confdir}/authorized_macs
-
-        #  If you want to use the old Cistron 'users' file
-        #  with FreeRADIUS, you should change the next line
-        #  to 'compat = cistron'.  You can the copy your 'users'
-        #  file from Cistron.
-        compat = no
+	key = "%{Calling-Station-ID}"
+	usersfile = \${confdir}/authorized_macs
+	compat = no
 }
+
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/files';
@@ -3473,7 +3181,6 @@ NUMFAILSLEFT=`expr $varsettingsmotppasswordattempts - \$NUMFAILS`
 logger -f /var/log/system.log "FreeRADIUS: Authentication failed! Mobile-One-Time-Password incorrect. \$NUMFAILSLEFT attempts left. "
 exit 11
 
-
 EOD;
 
 	$filename = FREERADIUS_SCRIPTS . '/otpverify.sh';
@@ -3493,7 +3200,8 @@ function freeradius_modulesmotp_resync() {
 exec motp {
 		wait = yes
 		program = "{$bash_path} {$varFREERADIUS_SCRIPTS}/otpverify.sh %{request:User-Name} %{request:User-Password} %{reply:MOTP-Init-Secret} %{reply:MOTP-PIN} %{reply:MOTP-Offset}"
-	}
+}
+
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/motp';
@@ -3514,19 +3222,20 @@ function freeradius_modulesdatacounter_resync() {
 exec datacounterdaily {
 		wait = yes
 		program = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_acct.sh %{request:User-Name} daily %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
-	}
+}
 exec datacounterweekly {
 		wait = yes
 		program = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_acct.sh %{request:User-Name} weekly %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
-	}
+}
 exec datacountermonthly {
 		wait = yes
 		program = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_acct.sh %{request:User-Name} monthly %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
-	}
+}
 exec datacounterforever {
 		wait = yes
 		program = "/bin/sh {$varFREERADIUS_SCRIPTS}/datacounter_acct.sh %{request:User-Name} forever %{request:Acct-Input-Octets} %{request:Acct-Output-Octets} %{request:Acct-Status-Type} %{request:Acct-Session-Id}"
-	}
+}
+
 EOD;
 
 	$filename = FREERADIUS_MODSENABLED . '/datacounter_acct';
@@ -3564,6 +3273,7 @@ else
 	logger -f /var/log/system.log "FreeRADIUS: User \$USERNAME has reached the \$TIMERANGE amount of upload and download traffic (\$USEDOCTETSUSERNAMEMB MB of \$MAXOCTETSUSERNAMEMB MB). The login request was denied."
 	exit 99
 fi
+
 EOD;
 
 	$filename = FREERADIUS_SCRIPTS . '/datacounter_auth.sh';
